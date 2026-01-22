@@ -72,14 +72,14 @@ jobs:
           ARCHIVE_NAME="${{ matrix.archive }}"
           rm -f "$ARCHIVE_NAME"
           if [[ "$ARCHIVE_NAME" == *.zip ]]; then
-            python - <<'PY'
-import pathlib
-import zipfile
-archive = pathlib.Path("${{ matrix.archive }}")
-binary = pathlib.Path("target/${{ matrix.target }}/release/${{ matrix.binary-name }}")
-with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-    zf.write(binary, arcname=binary.name)
-PY
+            python3 -c "
+          import pathlib
+          import zipfile
+          archive = pathlib.Path('${{ matrix.archive }}')
+          binary = pathlib.Path('target/${{ matrix.target }}/release/${{ matrix.binary-name }}')
+          with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+              zf.write(binary, arcname=binary.name)
+          "
           else
             tar -czf "$ARCHIVE_NAME" -C "target/${{ matrix.target }}/release" "${{ matrix.binary-name }}"
           fi
