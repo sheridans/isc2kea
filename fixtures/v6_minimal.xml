@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<opnsense>
+  <dhcpdv6>
+    <opt2>
+      <staticmap>
+        <duid>00:01:00:01:aa:bb:cc:dd:00:11:22:33:44:55</duid>
+        <ipaddrv6>2001:db8:42::10</ipaddrv6>
+        <hostname>host1</hostname>
+        <descr>test device 1</descr>
+        <domainsearchlist>mydomain.local</domainsearchlist>
+      </staticmap>
+    </opt2>
+  </dhcpdv6>
+  <Kea>
+    <dhcp6>
+      <subnets>
+        <subnet6 uuid="v6-subnet-uuid-1234">
+          <subnet>2001:db8:42::/64</subnet>
+        </subnet6>
+      </subnets>
+    </dhcp6>
+  </Kea>
+</opnsense>

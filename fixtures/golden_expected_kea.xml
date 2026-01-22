@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<opnsense>
+  <Kea>
+    <dhcp4>
+      <reservations>
+        <reservation>
+          <subnet>subnet-v4-1</subnet>
+          <ip_address>10.0.0.10</ip_address>
+          <hw_address>aa:bb:cc:dd:ee:ff</hw_address>
+          <hostname>golden4</hostname>
+          <description>golden v4 mapping</description>
+        </reservation>
+      </reservations>
+    </dhcp4>
+    <dhcp6>
+      <reservations>
+        <reservation>
+          <subnet>subnet-v6-1</subnet>
+          <ip_address>2001:db8:1::10</ip_address>
+          <duid>00:01:00:01:11:22:33:44:55:66:77:88:99:aa</duid>
+          <hostname>golden6</hostname>
+          <domain_search>example.local</domain_search>
+          <description>golden v6 mapping</description>
+        </reservation>
+      </reservations>
+    </dhcp6>
+  </Kea>
+</opnsense>

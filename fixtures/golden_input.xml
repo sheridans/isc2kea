@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<opnsense>
+  <dhcpd>
+    <lan>
+      <staticmap>
+        <mac>aa:bb:cc:dd:ee:ff</mac>
+        <ipaddr>10.0.0.10</ipaddr>
+        <hostname>golden4</hostname>
+        <descr>golden v4 mapping</descr>
+      </staticmap>
+    </lan>
+  </dhcpd>
+  <dhcpdv6>
+    <opt2>
+      <staticmap>
+        <duid>00:01:00:01:11:22:33:44:55:66:77:88:99:aa</duid>
+        <ipaddrv6>2001:db8:1::10</ipaddrv6>
+        <hostname>golden6</hostname>
+        <descr>golden v6 mapping</descr>
+        <domainsearchlist>example.local</domainsearchlist>
+      </staticmap>
+    </opt2>
+  </dhcpdv6>
+  <Kea>
+    <dhcp4>
+      <subnets>
+        <subnet4 uuid="subnet-v4-1">
+          <subnet>10.0.0.0/24</subnet>
+        </subnet4>
+      </subnets>
+    </dhcp4>
+    <dhcp6>
+      <subnets>
+        <subnet6 uuid="subnet-v6-1">
+          <subnet>2001:db8:1::/64</subnet>
+        </subnet6>
+      </subnets>
+    </dhcp6>
+  </Kea>
+</opnsense>

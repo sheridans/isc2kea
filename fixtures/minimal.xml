@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<opnsense>
+    <dhcpd>
+        <lan>
+            <enable>1</enable>
+            <range>
+                <from>192.168.1.100</from>
+                <to>192.168.1.200</to>
+            </range>
+            <staticmap>
+                <mac>00:11:22:33:44:55</mac>
+                <ipaddr>192.168.1.10</ipaddr>
+                <hostname>server1</hostname>
+                <descr>Main Server</descr>
+            </staticmap>
+            <staticmap>
+                <mac>aa:bb:cc:dd:ee:ff</mac>
+                <ipaddr>192.168.1.20</ipaddr>
+                <cid>workstation1</cid>
+                <descr>Development Workstation</descr>
+            </staticmap>
+        </lan>
+        <opt1>
+            <enable>1</enable>
+            <staticmap>
+                <mac>11:22:33:44:55:66</mac>
+                <ipaddr>10.0.0.50</ipaddr>
+                <hostname>printer1</hostname>
+            </staticmap>
+        </opt1>
+    </dhcpd>
+    <Kea>
+        <dhcp4>
+            <subnets>
+                <subnet4 uuid="a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d">
+                    <subnet>192.168.1.0/24</subnet>
+                </subnet4>
+                <subnet4 uuid="b2c3d4e5-f6a7-4b5c-9d0e-1f2a3b4c5d6e">
+                    <subnet>10.0.0.0/24</subnet>
+                </subnet4>
+            </subnets>
+        </dhcp4>
+    </Kea>
+</opnsense>

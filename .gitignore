@@ -1,0 +1,47 @@
+# Rust build artifacts
+/target/
+**/target/
+debug/
+release/
+
+# Cargo related backups
+**/*.rs.bk
+
+# Coverage and profiling
+coverage/
+htmlcov/
+*.lcov
+lcov.info
+*.profraw
+*.profdata
+flamegraph.svg
+perf.data*
+
+# Logs and runtime output
+*.log
+*.out
+*.err
+
+# Environment files
+.env
+.env.local
+.env.*
+
+# Dependency / package managers
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+# Editor and IDE settings
+.vscode/
+.idea/
+*.iml
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Other OS or tooling noise
+Desktop.ini
+$RECYCLE.BIN/
+*.tmp

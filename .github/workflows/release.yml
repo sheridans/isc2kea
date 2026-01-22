@@ -1,0 +1,119 @@
+name: Release Builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: isc2kea-linux-x86_64.tar.gz
+            binary-name: isc2kea
+            run-tests: true
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            archive: isc2kea-linux-aarch64.tar.gz
+            binary-name: isc2kea
+            run-tests: false
+          - os: macos-13
+            target: x86_64-apple-darwin
+            archive: isc2kea-macos-x86_64.tar.gz
+            binary-name: isc2kea
+            run-tests: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: isc2kea-windows-x86_64.zip
+            binary-name: isc2kea.exe
+            run-tests: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install aarch64 linker
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Run tests
+        if: matrix.run-tests == true
+        run: cargo test --locked --all-features
+
+      - name: Build release binary
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Package binary
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          BINARY_PATH="target/${{ matrix.target }}/release/${{ matrix.binary-name }}"
+          ARCHIVE_NAME="${{ matrix.archive }}"
+          rm -f "$ARCHIVE_NAME"
+          if [[ "$ARCHIVE_NAME" == *.zip ]]; then
+            python - <<'PY'
+import pathlib
+import zipfile
+archive = pathlib.Path("${{ matrix.archive }}")
+binary = pathlib.Path("target/${{ matrix.target }}/release/${{ matrix.binary-name }}")
+with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    zf.write(binary, arcname=binary.name)
+PY
+          else
+            tar -czf "$ARCHIVE_NAME" -C "target/${{ matrix.target }}/release" "${{ matrix.binary-name }}"
+          fi
+          echo "archive=$ARCHIVE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.archive }}
+          path: ${{ steps.package.outputs.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

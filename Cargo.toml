@@ -1,0 +1,20 @@
+[package]
+name = "isc2kea"
+version = "1.0.0"
+edition = "2021"
+description = "Migrate ISC DHCP static mappings to Kea DHCP reservations for OPNsense"
+license = "BSD-2-Clause"
+homepage = "https://github.com/sheridans/isc2kea"
+repository = "https://github.com/sheridans/isc2kea"
+readme = "README.md"
+keywords = ["opnsense", "firewall", "networking"]
+categories = ["network-programming", "command-line-utilities"]
+rust-version = "1.85"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "1.0"
+xmltree = "0.10"
+ipnet = "2.9"
+uuid = { version = "1.11", features = ["v4"] }
