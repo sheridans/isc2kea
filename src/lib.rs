@@ -1,4 +1,5 @@
 pub mod backend;
+pub mod cli;
 mod errors;
 mod extract;
 mod extract_dnsmasq;
