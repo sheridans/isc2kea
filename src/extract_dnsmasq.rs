@@ -123,3 +123,64 @@ pub(crate) fn extract_existing_dnsmasq_ranges(root: &Element) -> Result<HashSet<
 
     Ok(ranges)
 }
+
+pub(crate) fn dnsmasq_option_key(
+    opt_type: &str,
+    option: &str,
+    option6: &str,
+    iface: &str,
+    tag: &str,
+    set_tag: &str,
+) -> String {
+    format!(
+        "{}|{}|{}|{}|{}|{}",
+        opt_type, option, option6, iface, tag, set_tag
+    )
+}
+
+/// Extract existing dnsmasq DHCP options (type=set) for duplicate detection
+pub(crate) fn extract_existing_dnsmasq_options(root: &Element) -> Result<HashSet<String>> {
+    let mut options = HashSet::new();
+
+    if let Some(dnsmasq) = find_descendant_ci(root, "dnsmasq") {
+        for child in &dnsmasq.children {
+            if let Some(opt) = child.as_element() {
+                if opt.name.eq_ignore_ascii_case("dhcp_options") {
+                    let opt_type = get_child_ci(opt, "type")
+                        .and_then(|e| e.get_text())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+                    if !opt_type.eq_ignore_ascii_case("set") {
+                        continue;
+                    }
+                    let option = get_child_ci(opt, "option")
+                        .and_then(|e| e.get_text())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+                    let option6 = get_child_ci(opt, "option6")
+                        .and_then(|e| e.get_text())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+                    let iface = get_child_ci(opt, "interface")
+                        .and_then(|e| e.get_text())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+                    let tag = get_child_ci(opt, "tag")
+                        .and_then(|e| e.get_text())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+                    let set_tag = get_child_ci(opt, "set_tag")
+                        .and_then(|e| e.get_text())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+
+                    let key =
+                        dnsmasq_option_key(&opt_type, &option, &option6, &iface, &tag, &set_tag);
+                    options.insert(key);
+                }
+            }
+        }
+    }
+
+    Ok(options)
+}

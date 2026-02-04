@@ -83,6 +83,52 @@ fn dnsmasq_hosts(root: &Element) -> Vec<&Element> {
         .collect()
 }
 
+fn dnsmasq_option_value(
+    root: &Element,
+    iface: &str,
+    option: &str,
+    option6: &str,
+) -> Option<String> {
+    let dnsmasq = find_descendant_ci(root, "dnsmasq").expect("Should have dnsmasq node");
+    for elem in dnsmasq
+        .children
+        .iter()
+        .filter_map(|c| c.as_element())
+        .filter(|e| e.name == "dhcp_options")
+    {
+        let opt_type = elem
+            .get_child("type")
+            .and_then(|e| e.get_text())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if opt_type != "set" {
+            continue;
+        }
+        let iface_text = elem
+            .get_child("interface")
+            .and_then(|e| e.get_text())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let opt = elem
+            .get_child("option")
+            .and_then(|e| e.get_text())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let opt6 = elem
+            .get_child("option6")
+            .and_then(|e| e.get_text())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if iface_text == iface && opt == option && opt6 == option6 {
+            return elem
+                .get_child("value")
+                .and_then(|e| e.get_text())
+                .map(|s| s.to_string());
+        }
+    }
+    None
+}
+
 fn dnsmasq_options() -> MigrationOptions {
     MigrationOptions {
         backend: Backend::Dnsmasq,
@@ -416,6 +462,57 @@ const TEST_CREATE_SUBNETS_DNSMASQ_V6: &str = r#"<?xml version="1.0"?>
 </opnsense>
 "#;
 
+const TEST_CREATE_OPTIONS_DNSMASQ: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <dhcpd>
+        <opt1>
+            <dnsserver>8.8.8.8</dnsserver>
+            <dnsserver>1.1.1.1</dnsserver>
+            <gateway>10.22.1.1</gateway>
+            <domain>example.com</domain>
+            <domainsearchlist>example2.com; example3.com</domainsearchlist>
+            <ntpserver>10.22.1.10</ntpserver>
+        </opt1>
+    </dhcpd>
+    <dhcpdv6>
+        <lan>
+            <dnsserver>fd00:1234:5678:1::1</dnsserver>
+            <dnsserver>fd00:1234:5678:1::2</dnsserver>
+            <domainsearchlist>example.com</domainsearchlist>
+        </lan>
+    </dhcpdv6>
+    <dnsmasq></dnsmasq>
+</opnsense>
+"#;
+
+const TEST_CREATE_OPTIONS_DNSMASQ_EXISTING: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <dhcpd>
+        <opt1>
+            <dnsserver>8.8.8.8</dnsserver>
+            <dnsserver>1.1.1.1</dnsserver>
+            <gateway>10.22.1.1</gateway>
+            <domain>example.com</domain>
+            <domainsearchlist>example2.com example3.com</domainsearchlist>
+            <ntpserver>10.22.1.10</ntpserver>
+        </opt1>
+    </dhcpd>
+    <dnsmasq>
+        <dhcp_options uuid="existing-opt-1">
+            <type>set</type>
+            <option>6</option>
+            <option6></option6>
+            <interface>opt1</interface>
+            <tag></tag>
+            <set_tag></set_tag>
+            <value>9.9.9.9</value>
+            <force></force>
+            <description></description>
+        </dhcp_options>
+    </dnsmasq>
+</opnsense>
+"#;
+
 const TEST_CREATE_SUBNETS_KEA_V4_EXISTING: &str = r#"<?xml version="1.0"?>
 <opnsense>
     <interfaces>
@@ -630,6 +727,105 @@ const TEST_CREATE_SUBNETS_MULTI_RANGE_V6: &str = r#"<?xml version="1.0"?>
         <dhcp6>
             <subnets></subnets>
         </dhcp6>
+    </Kea>
+</opnsense>
+"#;
+
+const TEST_CREATE_OPTIONS_KEA_V4: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <opt1>
+            <dnsserver>8.8.8.8</dnsserver>
+            <dnsserver>1.1.1.1</dnsserver>
+            <gateway>10.22.1.1</gateway>
+            <domain>example.com</domain>
+            <domainsearchlist>example2.com; example3.com</domainsearchlist>
+            <ntpserver>10.22.1.10</ntpserver>
+        </opt1>
+    </dhcpd>
+    <Kea>
+        <dhcp4>
+            <subnets>
+                <subnet4 uuid="s4">
+                    <subnet>10.22.1.0/24</subnet>
+                    <option_data_autocollect>1</option_data_autocollect>
+                    <option_data>
+                        <domain_name_servers/>
+                        <domain_search/>
+                        <routers/>
+                        <domain_name/>
+                        <ntp_servers/>
+                    </option_data>
+                </subnet4>
+            </subnets>
+        </dhcp4>
+    </Kea>
+</opnsense>
+"#;
+
+const TEST_CREATE_OPTIONS_KEA_V6: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <lan>
+            <ipaddrv6>fd00:1234:5678:1::1</ipaddrv6>
+            <subnetv6>64</subnetv6>
+        </lan>
+    </interfaces>
+    <dhcpdv6>
+        <lan>
+            <dnsserver>fd00:1234:5678:1::1</dnsserver>
+            <dnsserver>fd00:1234:5678:1::2</dnsserver>
+            <domainsearchlist>example.com</domainsearchlist>
+        </lan>
+    </dhcpdv6>
+    <Kea>
+        <dhcp6>
+            <subnets>
+                <subnet6 uuid="s6">
+                    <subnet>fd00:1234:5678:1::/64</subnet>
+                    <option_data>
+                        <dns_servers/>
+                        <domain_search/>
+                    </option_data>
+                </subnet6>
+            </subnets>
+        </dhcp6>
+    </Kea>
+</opnsense>
+"#;
+
+const TEST_CREATE_OPTIONS_KEA_V4_EXISTING: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <opt1>
+            <dnsserver>8.8.8.8</dnsserver>
+            <gateway>10.22.1.1</gateway>
+        </opt1>
+    </dhcpd>
+    <Kea>
+        <dhcp4>
+            <subnets>
+                <subnet4 uuid="s4">
+                    <subnet>10.22.1.0/24</subnet>
+                    <option_data>
+                        <domain_name_servers>9.9.9.9</domain_name_servers>
+                        <routers>10.22.1.254</routers>
+                    </option_data>
+                </subnet4>
+            </subnets>
+        </dhcp4>
     </Kea>
 </opnsense>
 "#;
@@ -1946,4 +2142,228 @@ fn test_create_subnets_multiple_ranges_v6() {
     assert_eq!(pool_values.len(), 2);
     assert!(pool_values.contains(&"fd00:1234:5678:1::10 - fd00:1234:5678:1::20".to_string()));
     assert!(pool_values.contains(&"fd00:1234:5678:1::100 - fd00:1234:5678:1::200".to_string()));
+}
+
+#[test]
+fn test_create_options_kea_v4() {
+    let input = Cursor::new(TEST_CREATE_OPTIONS_KEA_V4);
+    let mut output = Vec::new();
+    let mut options = MigrationOptions::default();
+    options.create_options = true;
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp4 = kea.get_child("dhcp4").expect("Should have dhcp4 node");
+    let subnet4 = dhcp4
+        .get_child("subnets")
+        .and_then(|s| s.get_child("subnet4"))
+        .expect("Should have subnet4");
+    let option_data = subnet4
+        .get_child("option_data")
+        .expect("Should have option_data");
+
+    let dns = option_data
+        .get_child("domain_name_servers")
+        .and_then(|e| e.get_text())
+        .expect("Should have domain_name_servers");
+    assert_eq!(dns, "8.8.8.8,1.1.1.1");
+
+    let routers = option_data
+        .get_child("routers")
+        .and_then(|e| e.get_text())
+        .expect("Should have routers");
+    assert_eq!(routers, "10.22.1.1");
+
+    let domain = option_data
+        .get_child("domain_name")
+        .and_then(|e| e.get_text())
+        .expect("Should have domain_name");
+    assert_eq!(domain, "example.com");
+
+    let search = option_data
+        .get_child("domain_search")
+        .and_then(|e| e.get_text())
+        .expect("Should have domain_search");
+    assert_eq!(search, "example2.com example3.com");
+
+    let ntp = option_data
+        .get_child("ntp_servers")
+        .and_then(|e| e.get_text())
+        .expect("Should have ntp_servers");
+    assert_eq!(ntp, "10.22.1.10");
+
+    let autocollect = subnet4
+        .get_child("option_data_autocollect")
+        .and_then(|e| e.get_text())
+        .expect("Should have option_data_autocollect");
+    assert_eq!(autocollect, "0");
+}
+
+#[test]
+fn test_create_options_kea_v6() {
+    let input = Cursor::new(TEST_CREATE_OPTIONS_KEA_V6);
+    let mut output = Vec::new();
+    let mut options = MigrationOptions::default();
+    options.create_options = true;
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp6 = kea.get_child("dhcp6").expect("Should have dhcp6 node");
+    let subnet6 = dhcp6
+        .get_child("subnets")
+        .and_then(|s| s.get_child("subnet6"))
+        .expect("Should have subnet6");
+    let option_data = subnet6
+        .get_child("option_data")
+        .expect("Should have option_data");
+
+    let dns = option_data
+        .get_child("dns_servers")
+        .and_then(|e| e.get_text())
+        .expect("Should have dns_servers");
+    assert_eq!(dns, "fd00:1234:5678:1::1,fd00:1234:5678:1::2");
+
+    let search = option_data
+        .get_child("domain_search")
+        .and_then(|e| e.get_text())
+        .expect("Should have domain_search");
+    assert_eq!(search, "example.com");
+}
+
+#[test]
+fn test_create_options_kea_existing_skip_and_force() {
+    let input = Cursor::new(TEST_CREATE_OPTIONS_KEA_V4_EXISTING);
+    let mut output = Vec::new();
+    let mut options = MigrationOptions::default();
+    options.create_options = true;
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp4 = kea.get_child("dhcp4").expect("Should have dhcp4 node");
+    let subnet4 = dhcp4
+        .get_child("subnets")
+        .and_then(|s| s.get_child("subnet4"))
+        .expect("Should have subnet4");
+    let option_data = subnet4
+        .get_child("option_data")
+        .expect("Should have option_data");
+    let dns = option_data
+        .get_child("domain_name_servers")
+        .and_then(|e| e.get_text())
+        .expect("Should have domain_name_servers");
+    assert_eq!(dns, "9.9.9.9");
+
+    let mut output_force = Vec::new();
+    let mut options_force = MigrationOptions::default();
+    options_force.create_options = true;
+    options_force.force_options = true;
+
+    convert_config(
+        Cursor::new(TEST_CREATE_OPTIONS_KEA_V4_EXISTING),
+        &mut output_force,
+        &options_force,
+    )
+    .expect("convert should succeed with force");
+    let output_str = String::from_utf8(output_force).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp4 = kea.get_child("dhcp4").expect("Should have dhcp4 node");
+    let subnet4 = dhcp4
+        .get_child("subnets")
+        .and_then(|s| s.get_child("subnet4"))
+        .expect("Should have subnet4");
+    let option_data = subnet4
+        .get_child("option_data")
+        .expect("Should have option_data");
+    let dns = option_data
+        .get_child("domain_name_servers")
+        .and_then(|e| e.get_text())
+        .expect("Should have domain_name_servers");
+    assert_eq!(dns, "8.8.8.8");
+}
+
+#[test]
+fn test_create_options_dnsmasq() {
+    let input = Cursor::new(TEST_CREATE_OPTIONS_DNSMASQ);
+    let mut output = Vec::new();
+    let mut options = dnsmasq_options();
+    options.create_options = true;
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+
+    let dns = dnsmasq_option_value(&root, "opt1", "6", "").expect("dns option should exist");
+    assert_eq!(dns, "8.8.8.8,1.1.1.1");
+
+    let routers = dnsmasq_option_value(&root, "opt1", "3", "").expect("router option should exist");
+    assert_eq!(routers, "10.22.1.1");
+
+    let domain = dnsmasq_option_value(&root, "opt1", "15", "").expect("domain option should exist");
+    assert_eq!(domain, "example.com");
+
+    let search =
+        dnsmasq_option_value(&root, "opt1", "119", "").expect("search option should exist");
+    assert_eq!(search, "example2.com,example3.com");
+
+    let ntp = dnsmasq_option_value(&root, "opt1", "42", "").expect("ntp option should exist");
+    assert_eq!(ntp, "10.22.1.10");
+
+    let v6_dns = dnsmasq_option_value(&root, "lan", "", "23").expect("v6 dns option should exist");
+    assert_eq!(v6_dns, "fd00:1234:5678:1::1,fd00:1234:5678:1::2");
+
+    let v6_search =
+        dnsmasq_option_value(&root, "lan", "", "24").expect("v6 search option should exist");
+    assert_eq!(v6_search, "example.com");
+}
+
+#[test]
+fn test_create_options_dnsmasq_existing_skip_and_force() {
+    let input = Cursor::new(TEST_CREATE_OPTIONS_DNSMASQ_EXISTING);
+    let mut output = Vec::new();
+    let mut options = dnsmasq_options();
+    options.create_options = true;
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let dns = dnsmasq_option_value(&root, "opt1", "6", "").expect("dns option should exist");
+    assert_eq!(dns, "9.9.9.9");
+
+    let routers = dnsmasq_option_value(&root, "opt1", "3", "").expect("router option should exist");
+    assert_eq!(routers, "10.22.1.1");
+
+    let mut output_force = Vec::new();
+    let mut options_force = dnsmasq_options();
+    options_force.create_options = true;
+    options_force.force_options = true;
+
+    convert_config(
+        Cursor::new(TEST_CREATE_OPTIONS_DNSMASQ_EXISTING),
+        &mut output_force,
+        &options_force,
+    )
+    .expect("convert should succeed with force");
+    let output_str = String::from_utf8(output_force).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let dns = dnsmasq_option_value(&root, "opt1", "6", "").expect("dns option should exist");
+    assert_eq!(dns, "8.8.8.8,1.1.1.1");
 }

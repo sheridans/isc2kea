@@ -7,16 +7,18 @@ use crate::backend::Backend;
 use crate::extract::{
     extract_existing_reservation_duids_v6, extract_existing_reservation_ips,
     extract_existing_reservation_ips_v6, extract_interface_cidrs, extract_interface_cidrs_v6,
-    extract_isc_mappings, extract_isc_mappings_v6, extract_isc_ranges, extract_isc_ranges_v6,
-    extract_kea_subnets, extract_kea_subnets_v6, has_kea_dhcp4, has_kea_dhcp6,
+    extract_isc_mappings, extract_isc_mappings_v6, extract_isc_options_v4, extract_isc_options_v6,
+    extract_isc_ranges, extract_isc_ranges_v6, extract_kea_subnets, extract_kea_subnets_v6,
+    has_kea_dhcp4, has_kea_dhcp6,
 };
 use crate::extract_dnsmasq::{
-    extract_existing_dnsmasq_client_ids, extract_existing_dnsmasq_ips,
-    extract_existing_dnsmasq_macs, extract_existing_dnsmasq_ranges, has_dnsmasq,
+    dnsmasq_option_key, extract_existing_dnsmasq_client_ids, extract_existing_dnsmasq_ips,
+    extract_existing_dnsmasq_macs, extract_existing_dnsmasq_options,
+    extract_existing_dnsmasq_ranges, has_dnsmasq,
 };
 use crate::migrate_dnsmasq::{
-    create_dnsmasq_host_element, create_dnsmasq_host_element_v6, create_dnsmasq_range_element_v4,
-    create_dnsmasq_range_element_v6, get_dnsmasq_node,
+    create_dnsmasq_host_element, create_dnsmasq_host_element_v6, create_dnsmasq_option_element,
+    create_dnsmasq_range_element_v4, create_dnsmasq_range_element_v6, get_dnsmasq_node,
 };
 use crate::migrate_v4::{create_reservation_element, get_reservations_node};
 use crate::migrate_v6::{create_reservation_element_v6, get_reservations_node_v6};
@@ -24,8 +26,8 @@ use crate::subnet::{
     find_subnet_for_ip, find_subnet_for_ip_v6, ip_in_subnet, ip_in_subnet_v6, prefix_to_netmask,
 };
 use crate::{
-    IscRangeV4, IscRangeV6, IscStaticMap, IscStaticMapV6, MigrationError, MigrationOptions,
-    MigrationStats,
+    IscDhcpOptionsV4, IscDhcpOptionsV6, IscRangeV4, IscRangeV6, IscStaticMap, IscStaticMapV6,
+    MigrationError, MigrationOptions, MigrationStats,
 };
 
 fn short_uuid(uuid: &str) -> &str {
@@ -276,6 +278,310 @@ fn apply_kea_subnets(
     Ok(())
 }
 
+fn apply_kea_options(
+    root: &mut Element,
+    options_v4: &[IscDhcpOptionsV4],
+    options_v6: &[IscDhcpOptionsV6],
+    force: bool,
+) -> Result<()> {
+    let iface_cidrs_v4 = extract_interface_cidrs(root)?;
+    let iface_cidrs_v6 = extract_interface_cidrs_v6(root)?;
+
+    let mut v4_by_cidr = std::collections::HashMap::new();
+    for opt in options_v4 {
+        if let Some(cidr) = iface_cidrs_v4.get(&opt.iface) {
+            v4_by_cidr.insert(cidr.clone(), opt.clone());
+        } else {
+            eprintln!(
+                "Warning: No interface CIDR found for DHCPv4 options (iface {}). Skipping.",
+                opt.iface
+            );
+        }
+    }
+
+    let mut v6_by_cidr = std::collections::HashMap::new();
+    for opt in options_v6 {
+        if let Some(cidr) = iface_cidrs_v6.get(&opt.iface) {
+            v6_by_cidr.insert(cidr.clone(), opt.clone());
+        } else {
+            eprintln!(
+                "Warning: No interface CIDR found for DHCPv6 options (iface {}). Skipping.",
+                opt.iface
+            );
+        }
+    }
+
+    // DHCPv4 options
+    if let Some(kea) = crate::xml_helpers::find_mut_descendant_ci(root, "Kea") {
+        if let Some(dhcp4) = crate::xml_helpers::find_mut_descendant_ci(kea, "dhcp4") {
+            if let Some(subnets) = crate::xml_helpers::get_mut_child_ci(dhcp4, "subnets") {
+                for subnet in subnets
+                    .children
+                    .iter_mut()
+                    .filter_map(|n| n.as_mut_element())
+                    .filter(|e| e.name.eq_ignore_ascii_case("subnet4"))
+                {
+                    let cidr = crate::xml_helpers::get_child_ci(subnet, "subnet")
+                        .and_then(|e| e.get_text())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+                    let Some(opt) = v4_by_cidr.get(&cidr) else {
+                        continue;
+                    };
+
+                    if crate::xml_helpers::get_mut_child_ci(subnet, "option_data").is_none() {
+                        subnet
+                            .children
+                            .push(XMLNode::Element(Element::new("option_data")));
+                    }
+
+                    if let Some(auto) =
+                        crate::xml_helpers::get_mut_child_ci(subnet, "option_data_autocollect")
+                    {
+                        auto.children.clear();
+                        auto.children.push(XMLNode::Text("0".to_string()));
+                    } else {
+                        let mut auto = Element::new("option_data_autocollect");
+                        auto.children.push(XMLNode::Text("0".to_string()));
+                        subnet.children.push(XMLNode::Element(auto));
+                    }
+
+                    let option_data = crate::xml_helpers::get_mut_child_ci(subnet, "option_data")
+                        .ok_or_else(|| anyhow!("Failed to access Kea option_data"))?;
+
+                    set_option_value(
+                        option_data,
+                        "domain_name_servers",
+                        join_list(&opt.dns_servers),
+                        force,
+                    );
+                    set_option_value(option_data, "routers", opt.routers.clone(), force);
+                    set_option_value(option_data, "domain_name", opt.domain_name.clone(), force);
+                    set_option_value(
+                        option_data,
+                        "domain_search",
+                        opt.domain_search.clone(),
+                        force,
+                    );
+                    set_option_value(
+                        option_data,
+                        "ntp_servers",
+                        join_list(&opt.ntp_servers),
+                        force,
+                    );
+                }
+            }
+        }
+    }
+
+    // DHCPv6 options
+    if let Some(kea) = crate::xml_helpers::find_mut_descendant_ci(root, "Kea") {
+        if let Some(dhcp6) = crate::xml_helpers::find_mut_descendant_ci(kea, "dhcp6") {
+            if let Some(subnets) = crate::xml_helpers::get_mut_child_ci(dhcp6, "subnets") {
+                for subnet in subnets
+                    .children
+                    .iter_mut()
+                    .filter_map(|n| n.as_mut_element())
+                    .filter(|e| e.name.eq_ignore_ascii_case("subnet6"))
+                {
+                    let cidr = crate::xml_helpers::get_child_ci(subnet, "subnet")
+                        .and_then(|e| e.get_text())
+                        .map(|s| s.to_string())
+                        .unwrap_or_default();
+                    let Some(opt) = v6_by_cidr.get(&cidr) else {
+                        continue;
+                    };
+
+                    if crate::xml_helpers::get_mut_child_ci(subnet, "option_data").is_none() {
+                        subnet
+                            .children
+                            .push(XMLNode::Element(Element::new("option_data")));
+                    }
+                    let option_data = crate::xml_helpers::get_mut_child_ci(subnet, "option_data")
+                        .ok_or_else(|| anyhow!("Failed to access Kea option_data"))?;
+
+                    set_option_value(
+                        option_data,
+                        "dns_servers",
+                        join_list(&opt.dns_servers),
+                        force,
+                    );
+                    set_option_value(
+                        option_data,
+                        "domain_search",
+                        opt.domain_search.clone(),
+                        force,
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn set_option_value(target: &mut Element, tag: &str, value: Option<String>, force: bool) {
+    let Some(val) = value.filter(|v| !v.is_empty()) else {
+        return;
+    };
+    let child = crate::xml_helpers::get_mut_child_ci(target, tag);
+    match child {
+        Some(elem) => {
+            let existing = elem.get_text().map(|v| v.to_string()).unwrap_or_default();
+            if !existing.is_empty() && !force {
+                eprintln!(
+                    "Warning: Kea option {} already set ({}). Skipping.",
+                    tag, existing
+                );
+                return;
+            }
+            elem.children.clear();
+            elem.children.push(XMLNode::Text(val));
+        }
+        None => {
+            let mut elem = Element::new(tag);
+            elem.children.push(XMLNode::Text(val));
+            target.children.push(XMLNode::Element(elem));
+        }
+    }
+}
+
+fn join_list(values: &[String]) -> Option<String> {
+    let filtered: Vec<String> = values.iter().filter(|v| !v.is_empty()).cloned().collect();
+    if filtered.is_empty() {
+        None
+    } else {
+        Some(filtered.join(","))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct DnsmasqOptionSpec {
+    iface: String,
+    option: String,
+    option6: String,
+    value: String,
+}
+
+fn domain_search_csv(value: &str) -> Option<String> {
+    let parts: Vec<String> = value
+        .split(|c: char| c == ';' || c == ',' || c.is_whitespace())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(","))
+    }
+}
+
+fn dnsmasq_option_specs_from_isc(
+    options_v4: &[IscDhcpOptionsV4],
+    options_v6: &[IscDhcpOptionsV6],
+) -> Vec<DnsmasqOptionSpec> {
+    let mut specs = Vec::new();
+
+    for opt in options_v4 {
+        if let Some(value) = join_list(&opt.dns_servers) {
+            specs.push(DnsmasqOptionSpec {
+                iface: opt.iface.clone(),
+                option: "6".to_string(),
+                option6: String::new(),
+                value,
+            });
+        }
+        if let Some(value) = opt.routers.clone().filter(|v| !v.is_empty()) {
+            specs.push(DnsmasqOptionSpec {
+                iface: opt.iface.clone(),
+                option: "3".to_string(),
+                option6: String::new(),
+                value,
+            });
+        }
+        if let Some(value) = opt.domain_name.clone().filter(|v| !v.is_empty()) {
+            specs.push(DnsmasqOptionSpec {
+                iface: opt.iface.clone(),
+                option: "15".to_string(),
+                option6: String::new(),
+                value,
+            });
+        }
+        if let Some(value) = opt.domain_search.as_deref().and_then(domain_search_csv) {
+            specs.push(DnsmasqOptionSpec {
+                iface: opt.iface.clone(),
+                option: "119".to_string(),
+                option6: String::new(),
+                value,
+            });
+        }
+        if let Some(value) = join_list(&opt.ntp_servers) {
+            specs.push(DnsmasqOptionSpec {
+                iface: opt.iface.clone(),
+                option: "42".to_string(),
+                option6: String::new(),
+                value,
+            });
+        }
+    }
+
+    for opt in options_v6 {
+        if let Some(value) = join_list(&opt.dns_servers) {
+            specs.push(DnsmasqOptionSpec {
+                iface: opt.iface.clone(),
+                option: String::new(),
+                option6: "23".to_string(),
+                value,
+            });
+        }
+        if let Some(value) = opt.domain_search.as_deref().and_then(domain_search_csv) {
+            specs.push(DnsmasqOptionSpec {
+                iface: opt.iface.clone(),
+                option: String::new(),
+                option6: "24".to_string(),
+                value,
+            });
+        }
+    }
+
+    specs
+}
+
+fn dnsmasq_option_key_from_elem(elem: &Element) -> Option<String> {
+    if !elem.name.eq_ignore_ascii_case("dhcp_options") {
+        return None;
+    }
+    let opt_type = crate::xml_helpers::get_child_ci(elem, "type")
+        .and_then(|e| e.get_text())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    if !opt_type.eq_ignore_ascii_case("set") {
+        return None;
+    }
+    let option = crate::xml_helpers::get_child_ci(elem, "option")
+        .and_then(|e| e.get_text())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    let option6 = crate::xml_helpers::get_child_ci(elem, "option6")
+        .and_then(|e| e.get_text())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    let iface = crate::xml_helpers::get_child_ci(elem, "interface")
+        .and_then(|e| e.get_text())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    let tag = crate::xml_helpers::get_child_ci(elem, "tag")
+        .and_then(|e| e.get_text())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    let set_tag = crate::xml_helpers::get_child_ci(elem, "set_tag")
+        .and_then(|e| e.get_text())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+    Some(dnsmasq_option_key(
+        &opt_type, &option, &option6, &iface, &tag, &set_tag,
+    ))
+}
 fn cidr_prefix_v4(cidr: &str) -> Result<u8> {
     let net = ipnet::Ipv4Net::from_str(cidr)
         .map_err(|_| MigrationError::InvalidCidr(cidr.to_string()))?;
@@ -611,6 +917,16 @@ fn convert_kea(
     } else {
         Vec::new()
     };
+    let options_v4 = if options.create_options {
+        extract_isc_options_v4(root)?
+    } else {
+        Vec::new()
+    };
+    let options_v6 = if options.create_options {
+        extract_isc_options_v6(root)?
+    } else {
+        Vec::new()
+    };
     if options.create_subnets {
         apply_kea_subnets(
             root,
@@ -620,6 +936,10 @@ fn convert_kea(
             &desired_v6,
             options,
         )?;
+    }
+
+    if options.create_options {
+        apply_kea_options(root, &options_v4, &options_v6, options.force_options)?;
     }
 
     // Early check: differentiate between "Kea not configured" vs "no subnets"
@@ -821,11 +1141,27 @@ fn scan_dnsmasq(
     } else {
         Vec::new()
     };
+    let options_v4 = if options.create_options {
+        extract_isc_options_v4(root)?
+    } else {
+        Vec::new()
+    };
+    let options_v6 = if options.create_options {
+        extract_isc_options_v6(root)?
+    } else {
+        Vec::new()
+    };
+    let desired_options = if options.create_options {
+        dnsmasq_option_specs_from_isc(&options_v4, &options_v6)
+    } else {
+        Vec::new()
+    };
 
     if (!isc_mappings.is_empty()
         || !isc_mappings_v6.is_empty()
         || !desired_v4.is_empty()
-        || !desired_v6.is_empty())
+        || !desired_v6.is_empty()
+        || !desired_options.is_empty())
         && !has_dnsmasq(root)
     {
         return Err(MigrationError::BackendNotConfigured {
@@ -998,11 +1334,27 @@ fn convert_dnsmasq(
     } else {
         Vec::new()
     };
+    let options_v4 = if options.create_options {
+        extract_isc_options_v4(root)?
+    } else {
+        Vec::new()
+    };
+    let options_v6 = if options.create_options {
+        extract_isc_options_v6(root)?
+    } else {
+        Vec::new()
+    };
+    let desired_options = if options.create_options {
+        dnsmasq_option_specs_from_isc(&options_v4, &options_v6)
+    } else {
+        Vec::new()
+    };
 
     if (!isc_mappings.is_empty()
         || !isc_mappings_v6.is_empty()
         || !desired_v4.is_empty()
-        || !desired_v6.is_empty())
+        || !desired_v6.is_empty()
+        || !desired_options.is_empty())
         && !has_dnsmasq(root)
     {
         return Err(MigrationError::BackendNotConfigured {
@@ -1015,6 +1367,11 @@ fn convert_dnsmasq(
     let existing_macs = extract_existing_dnsmasq_macs(root)?;
     let existing_client_ids = extract_existing_dnsmasq_client_ids(root)?;
     let existing_ranges = extract_existing_dnsmasq_ranges(root)?;
+    let existing_options = if options.create_options {
+        extract_existing_dnsmasq_options(root)?
+    } else {
+        std::collections::HashSet::new()
+    };
 
     if options.fail_if_existing
         && (!existing_ips.is_empty()
@@ -1046,6 +1403,7 @@ fn convert_dnsmasq(
     if !isc_mappings.is_empty()
         || !isc_mappings_v6.is_empty()
         || (options.create_subnets && (!desired_v4.is_empty() || !desired_v6.is_empty()))
+        || (options.create_options && !desired_options.is_empty())
     {
         let dnsmasq_node = get_dnsmasq_node(root)?;
 
@@ -1175,6 +1533,45 @@ fn convert_dnsmasq(
                     );
                     dnsmasq_node.children.push(XMLNode::Element(elem));
                 }
+            }
+        }
+
+        if options.create_options {
+            for spec in &desired_options {
+                let key =
+                    dnsmasq_option_key("set", &spec.option, &spec.option6, &spec.iface, "", "");
+                if existing_options.contains(&key) {
+                    if options.force_options {
+                        dnsmasq_node.children.retain(|child| {
+                            let Some(elem) = child.as_element() else {
+                                return true;
+                            };
+                            let Some(existing_key) = dnsmasq_option_key_from_elem(elem) else {
+                                return true;
+                            };
+                            existing_key != key
+                        });
+                    } else {
+                        eprintln!(
+                            "Warning: dnsmasq option {} already exists (iface {}). Skipping.",
+                            if spec.option.is_empty() {
+                                format!("v6:{}", spec.option6)
+                            } else {
+                                spec.option.clone()
+                            },
+                            spec.iface
+                        );
+                        continue;
+                    }
+                }
+
+                let elem = create_dnsmasq_option_element(
+                    &spec.iface,
+                    &spec.option,
+                    &spec.option6,
+                    &spec.value,
+                );
+                dnsmasq_node.children.push(XMLNode::Element(elem));
             }
         }
 

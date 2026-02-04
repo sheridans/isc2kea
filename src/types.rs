@@ -17,6 +17,23 @@ pub struct IscStaticMapV6 {
 }
 
 #[derive(Debug, Clone)]
+pub struct IscDhcpOptionsV4 {
+    pub iface: String,
+    pub dns_servers: Vec<String>,
+    pub routers: Option<String>,
+    pub domain_name: Option<String>,
+    pub domain_search: Option<String>,
+    pub ntp_servers: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IscDhcpOptionsV6 {
+    pub iface: String,
+    pub dns_servers: Vec<String>,
+    pub domain_search: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct IscRangeV4 {
     pub iface: String,
     pub from: String,
@@ -66,4 +83,6 @@ pub struct MigrationOptions {
     pub backend: Backend,
     pub create_subnets: bool,
     pub force_subnets: bool,
+    pub create_options: bool,
+    pub force_options: bool,
 }

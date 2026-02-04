@@ -249,3 +249,33 @@ pub fn create_dnsmasq_range_element_v6(
 
     range
 }
+
+/// Create a dnsmasq DHCP option element (type=set).
+pub fn create_dnsmasq_option_element(
+    iface: &str,
+    option: &str,
+    option6: &str,
+    value: &str,
+) -> Element {
+    let mut opt = Element::new("dhcp_options");
+    opt.attributes
+        .insert("uuid".to_string(), uuid::Uuid::new_v4().to_string());
+
+    for (tag, val) in [
+        ("type", "set"),
+        ("option", option),
+        ("option6", option6),
+        ("interface", iface),
+        ("tag", ""),
+        ("set_tag", ""),
+        ("value", value),
+        ("force", ""),
+        ("description", ""),
+    ] {
+        let mut elem = Element::new(tag);
+        elem.children.push(XMLNode::Text(val.to_string()));
+        opt.children.push(XMLNode::Element(elem));
+    }
+
+    opt
+}

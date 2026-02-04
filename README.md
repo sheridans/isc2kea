@@ -4,7 +4,7 @@ A safe, production-ready CLI tool to migrate ISC DHCP static mappings to Kea DHC
 
 **Designed for OPNsense** config.xml layouts, but may work with similar XML schemas.
 
-**Note**: This tool migrates **static mappings** (ISC DHCP to Kea reservations or dnsmasq hosts) for DHCPv4 and DHCPv6. It does not migrate DHCP options, DDNS, PXE, or HA/failover configurations. Subnet/range creation is optional via `--create-subnets`.
+**Note**: This tool migrates **static mappings** (ISC DHCP to Kea reservations or dnsmasq hosts) for DHCPv4 and DHCPv6. It does not migrate DHCP options by default (opt-in subset supported), DDNS, PXE, or HA/failover configurations. Subnet/range creation is optional via `--create-subnets`.
 
 **Tested**: Verified against a real OPNsense 25.7.11-generated `config.xml` with Kea DHCPv4/DHCPv6 subnets and ISC static mappings. XML layouts may change in future OPNsense releases; revalidate before using with newer versions.
 
@@ -26,6 +26,13 @@ isc2kea scan --in ./your-config.xml --create-subnets
 isc2kea convert --in ./your-config.xml --out /conf/config.xml.new --create-subnets
 ```
 
+Optional (create DHCP options in Kea from ISC):
+
+```bash
+isc2kea scan --in ./your-config.xml --create-options
+isc2kea convert --in ./your-config.xml --out /conf/config.xml.new --create-options
+```
+
 ### Migrate to dnsmasq
 
 1. Ensure dnsmasq is configured in `config.xml` (it does not need to be enabled yet).
@@ -42,6 +49,13 @@ isc2kea scan --in ./your-config.xml --backend dnsmasq --create-subnets
 isc2kea convert --in ./your-config.xml --out /conf/config.xml.new --backend dnsmasq --create-subnets
 ```
 
+Optional (create DHCP options in dnsmasq from ISC):
+
+```bash
+isc2kea scan --in ./your-config.xml --backend dnsmasq --create-options
+isc2kea convert --in ./your-config.xml --out /conf/config.xml.new --backend dnsmasq --create-options
+```
+
 ## Why This Exists
 
 OPNsense is deprecating ISC DHCP in favor of Kea. Static mappings are often the hardest part of that migration, so this open-source tool migrates IPv4/IPv6 static mappings from ISC to Kea or dnsmasq using `config.xml`. It does not touch services or reload anything; it only adds reservations/hosts to the target backend config.
@@ -54,6 +68,7 @@ This tool is designed to be safe on production firewalls:
 - **No in-place edits** - Always writes to a separate output file
 - **Fails loudly** - Aborts on ambiguity or invalid data (never auto-creates backend sections)
 - **No subnet/range creation by default** - Subnets/ranges must already exist unless you use `--create-subnets`
+- **No DHCP options creation by default** - Kea and dnsmasq options are unchanged unless you use `--create-options`
 - **No guessing** - Requires exact subnet matches for all IP addresses (Kea backend)
 - **Duplicate detection** - Handles messy ISC configs with duplicate IPs and MACs
 - **Case-insensitive** - Works with any tag casing: `<Kea>`/`<kea>`, `<DHCPD>`/`<dhcpd>`, etc.
@@ -93,6 +108,49 @@ Behavior:
 Notes:
 - Subnets are derived from interface IP + prefix (`<interfaces>`), and pools/ranges come from ISC `<range>` entries.
 - **Prefix Delegation (`prefixrange`) is not yet supported** and is ignored.
+
+### Optional DHCP Option Creation (Kea and dnsmasq)
+
+By default, DHCP options are not created. To populate Kea `option_data` or dnsmasq DHCP options from ISC DHCP:
+
+```bash
+isc2kea scan --in /conf/config.xml --create-options
+isc2kea convert --in /conf/config.xml --out /tmp/config.xml --create-options
+```
+
+dnsmasq:
+
+```bash
+isc2kea scan --in /conf/config.xml --backend dnsmasq --create-options
+isc2kea convert --in /conf/config.xml --out /tmp/config.xml --backend dnsmasq --create-options
+```
+
+Behavior:
+- **Add-only**: existing Kea/dnsmasq option values are left untouched and a warning is printed.
+- **Force overwrite** (dangerous): use `--force-options` to replace existing option values.
+
+Supported (initial set):
+- DHCPv4: DNS servers, routers (gateway), domain name, domain search list, NTP servers
+- DHCPv6: DNS servers, domain search list
+- dnsmasq: `type=set` options only (tag-based `type=match` options are not supported)
+
+dnsmasq option mapping:
+
+| ISC field | dnsmasq option code |
+|---|---|
+| DHCPv4 `dnsserver` | 6 |
+| DHCPv4 `gateway` | 3 |
+| DHCPv4 `domain` | 15 |
+| DHCPv4 `domainsearchlist` | 119 |
+| DHCPv4 `ntpserver` | 42 |
+| DHCPv6 `dnsserver` | option6 23 |
+| DHCPv6 `domainsearchlist` | option6 24 |
+
+Deferred:
+- Static routes / classless static routes
+- TFTP / boot options
+- Time servers
+- Prefix Delegation options
 
 ### Backend Selection
 
@@ -268,7 +326,7 @@ dnsmasq hosts are flat entries (no subnet association required). IPv6 mappings a
 ## What Does NOT Get Migrated
 
 - DHCP pools/ranges (unless `--create-subnets` is used)
-- DHCP options
+- DHCP options (unless `--create-options` is used for Kea or dnsmasq)
 - DDNS settings
 - PXE/boot options
 - HA/failover configuration

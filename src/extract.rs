@@ -3,7 +3,10 @@ use std::collections::HashSet;
 use xmltree::Element;
 
 use crate::xml_helpers::{find_descendant_ci, get_child_ci};
-use crate::{IscRangeV4, IscRangeV6, IscStaticMap, IscStaticMapV6, Subnet, SubnetV6};
+use crate::{
+    IscDhcpOptionsV4, IscDhcpOptionsV6, IscRangeV4, IscRangeV6, IscStaticMap, IscStaticMapV6,
+    Subnet, SubnetV6,
+};
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
@@ -134,6 +137,128 @@ pub fn extract_isc_mappings_v6(root: &Element) -> Result<Vec<IscStaticMapV6>> {
     }
 
     Ok(mappings)
+}
+
+/// Extract ISC DHCPv4 options per interface
+pub fn extract_isc_options_v4(root: &Element) -> Result<Vec<IscDhcpOptionsV4>> {
+    let mut options = Vec::new();
+
+    if let Some(dhcpd) = get_child_ci(root, "dhcpd") {
+        for iface_node in dhcpd.children.iter() {
+            if let Some(iface_elem) = iface_node.as_element() {
+                let iface_name = iface_elem.name.clone();
+                let mut dns_servers = Vec::new();
+                let mut ntp_servers = Vec::new();
+                let mut routers = None;
+                let mut domain_name = None;
+                let mut domain_search = None;
+
+                for child in iface_elem.children.iter().filter_map(|c| c.as_element()) {
+                    if child.name.eq_ignore_ascii_case("dnsserver") {
+                        if let Some(val) = child.get_text() {
+                            let v = val.to_string();
+                            if !v.is_empty() {
+                                dns_servers.push(v);
+                            }
+                        }
+                    }
+                    if child.name.eq_ignore_ascii_case("ntpserver") {
+                        if let Some(val) = child.get_text() {
+                            let v = val.to_string();
+                            if !v.is_empty() {
+                                ntp_servers.push(v);
+                            }
+                        }
+                    }
+                    if child.name.eq_ignore_ascii_case("gateway") {
+                        routers = child
+                            .get_text()
+                            .map(|v| v.to_string())
+                            .filter(|v| !v.is_empty());
+                    }
+                    if child.name.eq_ignore_ascii_case("domain") {
+                        domain_name = child
+                            .get_text()
+                            .map(|v| v.to_string())
+                            .filter(|v| !v.is_empty());
+                    }
+                    if child.name.eq_ignore_ascii_case("domainsearchlist") {
+                        domain_search = child
+                            .get_text()
+                            .map(|v| v.to_string())
+                            .filter(|v| !v.is_empty());
+                    }
+                }
+
+                if !dns_servers.is_empty()
+                    || !ntp_servers.is_empty()
+                    || routers.is_some()
+                    || domain_name.is_some()
+                    || domain_search.is_some()
+                {
+                    options.push(IscDhcpOptionsV4 {
+                        iface: iface_name,
+                        dns_servers,
+                        routers,
+                        domain_name,
+                        domain_search: domain_search.map(normalize_domain_search),
+                        ntp_servers,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(options)
+}
+
+/// Extract ISC DHCPv6 options per interface
+pub fn extract_isc_options_v6(root: &Element) -> Result<Vec<IscDhcpOptionsV6>> {
+    let mut options = Vec::new();
+
+    if let Some(dhcpdv6) = get_child_ci(root, "dhcpdv6") {
+        for iface_node in dhcpdv6.children.iter() {
+            if let Some(iface_elem) = iface_node.as_element() {
+                let iface_name = iface_elem.name.clone();
+                let mut dns_servers = Vec::new();
+                let mut domain_search = None;
+
+                for child in iface_elem.children.iter().filter_map(|c| c.as_element()) {
+                    if child.name.eq_ignore_ascii_case("dnsserver") {
+                        if let Some(val) = child.get_text() {
+                            let v = val.to_string();
+                            if !v.is_empty() {
+                                dns_servers.push(v);
+                            }
+                        }
+                    }
+                    if child.name.eq_ignore_ascii_case("domainsearchlist") {
+                        domain_search = child
+                            .get_text()
+                            .map(|v| v.to_string())
+                            .filter(|v| !v.is_empty());
+                    }
+                }
+
+                if !dns_servers.is_empty() || domain_search.is_some() {
+                    options.push(IscDhcpOptionsV6 {
+                        iface: iface_name,
+                        dns_servers,
+                        domain_search: domain_search.map(normalize_domain_search),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(options)
+}
+
+fn normalize_domain_search(raw: String) -> String {
+    raw.split(|c: char| c == ';' || c == ',' || c.is_whitespace())
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Extract ISC DHCPv4 ranges from the XML tree

@@ -41,6 +41,14 @@ enum Commands {
         #[arg(long, requires = "create_subnets")]
         force_subnets: bool,
 
+        /// Create DHCP options in the target backend
+        #[arg(long)]
+        create_options: bool,
+
+        /// Overwrite existing DHCP options when creating them
+        #[arg(long, requires = "create_options")]
+        force_options: bool,
+
         /// Show detailed progress for each mapping
         #[arg(short, long)]
         verbose: bool,
@@ -72,6 +80,14 @@ enum Commands {
         #[arg(long, requires = "create_subnets")]
         force_subnets: bool,
 
+        /// Create DHCP options in the target backend
+        #[arg(long)]
+        create_options: bool,
+
+        /// Overwrite existing DHCP options when creating them
+        #[arg(long, requires = "create_options")]
+        force_options: bool,
+
         /// Show detailed progress for each mapping
         #[arg(short, long)]
         verbose: bool,
@@ -99,6 +115,8 @@ fn run() -> Result<()> {
             fail_if_existing,
             create_subnets,
             force_subnets,
+            create_options,
+            force_options,
             verbose,
         } => {
             let mut file = File::open(&r#in)
@@ -113,6 +131,8 @@ fn run() -> Result<()> {
                 backend: backend.clone(),
                 create_subnets,
                 force_subnets,
+                create_options,
+                force_options,
             };
 
             let stats = match isc2kea::scan_config(Cursor::new(&buffer), &options) {
@@ -147,6 +167,8 @@ fn run() -> Result<()> {
             fail_if_existing,
             create_subnets,
             force_subnets,
+            create_options,
+            force_options,
             verbose,
             force,
         } => {
@@ -223,6 +245,8 @@ fn run() -> Result<()> {
                 backend: backend.clone(),
                 create_subnets,
                 force_subnets,
+                create_options,
+                force_options,
             };
 
             let stats = isc2kea::convert_config(input_file, output_file, &options)?;
