@@ -132,17 +132,12 @@ fn create_kea_subnet4_element(cidr: &str, ranges: &[IscRangeV4]) -> Element {
     subnet4.children.push(XMLNode::Element(subnet_elem));
 
     let mut pools = Element::new("pools");
-    for range in ranges {
-        let mut pool = Element::new("pool");
-        pool.attributes
-            .insert("uuid".to_string(), uuid::Uuid::new_v4().to_string());
-        let mut pool_value = Element::new("pool");
-        pool_value
-            .children
-            .push(XMLNode::Text(format!("{} - {}", range.from, range.to)));
-        pool.children.push(XMLNode::Element(pool_value));
-        pools.children.push(XMLNode::Element(pool));
-    }
+    let pool_str = ranges
+        .iter()
+        .map(|r| format!("{}-{}", r.from, r.to))
+        .collect::<Vec<_>>()
+        .join(",");
+    pools.children.push(XMLNode::Text(pool_str));
     subnet4.children.push(XMLNode::Element(pools));
 
     subnet4
@@ -159,17 +154,12 @@ fn create_kea_subnet6_element(cidr: &str, ranges: &[IscRangeV6]) -> Element {
     subnet6.children.push(XMLNode::Element(subnet_elem));
 
     let mut pools = Element::new("pools");
-    for range in ranges {
-        let mut pool = Element::new("pool");
-        pool.attributes
-            .insert("uuid".to_string(), uuid::Uuid::new_v4().to_string());
-        let mut pool_value = Element::new("pool");
-        pool_value
-            .children
-            .push(XMLNode::Text(format!("{} - {}", range.from, range.to)));
-        pool.children.push(XMLNode::Element(pool_value));
-        pools.children.push(XMLNode::Element(pool));
-    }
+    let pool_str = ranges
+        .iter()
+        .map(|r| format!("{}-{}", r.from, r.to))
+        .collect::<Vec<_>>()
+        .join(",");
+    pools.children.push(XMLNode::Text(pool_str));
     subnet6.children.push(XMLNode::Element(pools));
 
     subnet6

@@ -49,7 +49,16 @@ isc2kea convert --in ./config.xml --out ./config.xml.new --backend dnsmasq --cre
 
 1. Review the new file and compare it to your original
 2. Upload `config.xml.new` via the OPNsense UI (replacing the original)
-3. Reboot or reload the DHCP service
+3. Disable ISC DHCP and enable Kea (or dnsmasq) when you're happy with the config
+4. Reboot or reload the DHCP service
+5. Leases will appear after clients renew (you may need to renew or reboot clients)
+
+**Important: select your DHCP interfaces before enabling the new backend.** The tool does not configure which interfaces Kea or dnsmasq listens on. Without this, DHCP will not serve any clients.
+
+- **Kea**: Services > Kea DHCP > Settings > Interfaces
+- **dnsmasq**: Services > Dnsmasq DNS > Settings > Interfaces
+
+**Note: leases are not migrated.** The tool converts configuration only. Existing DHCP leases from ISC DHCP will not carry over — clients will request new leases from the new backend.
 
 ## Installation
 
@@ -111,6 +120,8 @@ isc2kea convert --in ./config.xml --out ./config.xml.new --create-subnets
 By default, DHCP options (DNS servers, gateway, domain, etc.) are not touched. Add `--create-options` to copy them from ISC DHCP into the target backend:
 
 - Existing option values are left alone. Only missing values are filled in. Use `--force-options` to overwrite them instead.
+- **Kea**: options are attached to subnets, so `--create-options` requires Kea subnets to exist. If they don't, combine with `--create-subnets` to create them in the same run.
+- **dnsmasq**: options are independent of ranges and will be created regardless.
 
 ```bash
 isc2kea scan --in ./config.xml --create-options
@@ -278,7 +289,8 @@ dnsmasq option mapping:
 
 - The output XML may have different whitespace/indentation than the original. This is cosmetic and does not affect OPNsense.
 - When multiple subnets overlap, the most specific one (longest prefix) is used.
-- Tested against a real OPNsense 26.1 `config.xml`. XML layouts may change in future OPNsense releases.
+- Tested against real OPNsense `config.xml` files from 25.7 and 26.1. An example config from a live OPNsense 25.7.11 system is included in `example/live.xml`.
+- XML layouts may change in future OPNsense releases; revalidate before using with newer versions.
 
 ## License
 
