@@ -4,7 +4,7 @@ A safe, production-ready CLI tool to migrate ISC DHCP static mappings to Kea DHC
 
 **Designed for OPNsense** config.xml layouts, but may work with similar XML schemas.
 
-**Note**: This tool migrates **static mappings only** (ISC DHCP to Kea reservations or dnsmasq hosts) for DHCPv4 and DHCPv6. It does not migrate pools, options, DDNS, PXE, or HA/failover configurations.
+**Note**: This tool migrates **static mappings** (ISC DHCP to Kea reservations or dnsmasq hosts) for DHCPv4 and DHCPv6. It does not migrate DHCP options, DDNS, PXE, or HA/failover configurations. Subnet/range creation is optional via `--create-subnets`.
 
 **Tested**: Verified against a real OPNsense 25.7.11-generated `config.xml` with Kea DHCPv4/DHCPv6 subnets and ISC static mappings. XML layouts may change in future OPNsense releases; revalidate before using with newer versions.
 
@@ -53,7 +53,7 @@ This tool is designed to be safe on production firewalls:
 - **Read-only by default** - No files are modified unless you explicitly use `convert --out`
 - **No in-place edits** - Always writes to a separate output file
 - **Fails loudly** - Aborts on ambiguity or invalid data (never auto-creates backend sections)
-- **No subnet creation by default** - Kea subnets must already exist unless you use `--create-subnets`
+- **No subnet/range creation by default** - Subnets/ranges must already exist unless you use `--create-subnets`
 - **No guessing** - Requires exact subnet matches for all IP addresses (Kea backend)
 - **Duplicate detection** - Handles messy ISC configs with duplicate IPs and MACs
 - **Case-insensitive** - Works with any tag casing: `<Kea>`/`<kea>`, `<DHCPD>`/`<dhcpd>`, etc.
@@ -172,7 +172,7 @@ isc2kea convert --out /tmp/config_migrated.xml --force
 3. Review the diff between the original and `.new` file
 4. Replace the config manually (outside the tool scope)
 
-Before running, create the required Kea DHCPv4/DHCPv6 subnets (or enable dnsmasq) in OPNsense, or use `--create-subnets`. The tool only adds reservations/hosts and will error if the target backend is not configured.
+Before running, create the required Kea DHCPv4/DHCPv6 subnets (or ensure dnsmasq is configured) in OPNsense, or use `--create-subnets`. The tool only adds reservations/hosts and will error if the target backend is not configured.
 
 ### Abort on Existing Reservations
 
@@ -267,7 +267,7 @@ dnsmasq hosts are flat entries (no subnet association required). IPv6 mappings a
 
 ## What Does NOT Get Migrated
 
-- DHCP pools/ranges
+- DHCP pools/ranges (unless `--create-subnets` is used)
 - DHCP options
 - DDNS settings
 - PXE/boot options
