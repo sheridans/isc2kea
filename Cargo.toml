@@ -1,8 +1,8 @@
 [package]
 name = "isc2kea"
-version = "1.0.1"
+version = "1.1.2"
 edition = "2021"
-description = "Migrate ISC DHCP static mappings to Kea DHCP reservations for OPNsense"
+description = "Migrate ISC DHCP static mappings to Kea or dnsmasq DHCP configurations for OPNsense"
 license = "BSD-2-Clause"
 homepage = "https://github.com/sheridans/isc2kea"
 repository = "https://github.com/sheridans/isc2kea"

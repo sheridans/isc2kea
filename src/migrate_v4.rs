@@ -50,10 +50,15 @@ pub fn create_reservation_element(mapping: &IscStaticMap, subnet_uuid: &str) -> 
 /// Creates <reservations> if it doesn't exist but dhcp4 does
 pub fn get_reservations_node(root: &mut Element) -> Result<&mut Element> {
     // Check <Kea>/<kea> exists (case-insensitive)
-    let kea = find_mut_descendant_ci(root, "Kea").ok_or(MigrationError::KeaNotConfigured)?;
+    let kea = find_mut_descendant_ci(root, "Kea").ok_or(MigrationError::BackendNotConfigured {
+        backend: "Kea".into(),
+    })?;
 
     // Check <dhcp4> exists
-    let dhcp4 = find_mut_descendant_ci(kea, "dhcp4").ok_or(MigrationError::KeaNotConfigured)?;
+    let dhcp4 =
+        find_mut_descendant_ci(kea, "dhcp4").ok_or(MigrationError::BackendNotConfigured {
+            backend: "Kea".into(),
+        })?;
 
     // Create <reservations> if it doesn't exist (this is safe - just adding reservation container)
     if get_child_ci(dhcp4, "reservations").is_none() {

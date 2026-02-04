@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<opnsense>
+  <interfaces>
+    <lan>
+      <ipaddrv6>fd00:1234:5678:1::1</ipaddrv6>
+      <subnetv6>64</subnetv6>
+    </lan>
+  </interfaces>
+  <dhcpdv6>
+    <lan>
+      <staticmap>
+        <duid>00:01:00:01:aa:bb:cc:dd:00:11:22:33:44:55</duid>
+        <ipaddrv6>fd00:1234:5678:1::101</ipaddrv6>
+        <hostname>ipv6examplehost</hostname>
+        <descr>test ipv6 static mapping</descr>
+        <domainsearchlist>example.com other.example</domainsearchlist>
+      </staticmap>
+    </lan>
+  </dhcpdv6>
+  <dnsmasq>
+  </dnsmasq>
+</opnsense>

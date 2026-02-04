@@ -52,8 +52,14 @@ pub fn create_reservation_element_v6(mapping: &IscStaticMapV6, subnet_uuid: &str
 /// Fails if Kea or dhcp6 sections don't exist (don't auto-create them)
 /// Creates <reservations> if it doesn't exist but dhcp6 does
 pub fn get_reservations_node_v6(root: &mut Element) -> Result<&mut Element> {
-    let kea = find_mut_descendant_ci(root, "Kea").ok_or(MigrationError::KeaV6NotConfigured)?;
-    let dhcp6 = find_mut_descendant_ci(kea, "dhcp6").ok_or(MigrationError::KeaV6NotConfigured)?;
+    let kea =
+        find_mut_descendant_ci(root, "Kea").ok_or(MigrationError::BackendV6NotConfigured {
+            backend: "Kea".into(),
+        })?;
+    let dhcp6 =
+        find_mut_descendant_ci(kea, "dhcp6").ok_or(MigrationError::BackendV6NotConfigured {
+            backend: "Kea".into(),
+        })?;
 
     if get_child_ci(dhcp6, "reservations").is_none() {
         let reservations = Element::new("reservations");

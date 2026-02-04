@@ -3,127 +3,27 @@ use std::collections::HashSet;
 use xmltree::Element;
 
 use crate::xml_helpers::{find_descendant_ci, get_child_ci};
-use crate::{IscStaticMap, IscStaticMapV6, KeaSubnet, KeaSubnetV6};
+use crate::{Subnet, SubnetV6};
 
-/// Extract ISC static mappings from the XML tree
-pub fn extract_isc_mappings(root: &Element) -> Result<Vec<IscStaticMap>> {
-    let mut mappings = Vec::new();
-
-    // Navigate to <dhcpd> (case-insensitive)
-    if let Some(dhcpd) = get_child_ci(root, "dhcpd") {
-        // Iterate over all interface nodes (lan, wan, opt1, etc.)
-        for iface_node in dhcpd.children.iter() {
-            if let Some(iface_elem) = iface_node.as_element() {
-                // Look for staticmap children (case-insensitive)
-                for child in iface_elem.children.iter() {
-                    if let Some(staticmap) = child.as_element() {
-                        if staticmap.name.eq_ignore_ascii_case("staticmap") {
-                            let mac = get_child_ci(staticmap, "mac")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string())
-                                .unwrap_or_default();
-
-                            let ipaddr = get_child_ci(staticmap, "ipaddr")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string())
-                                .unwrap_or_default();
-
-                            // Skip entries without essential fields
-                            if mac.is_empty() || ipaddr.is_empty() {
-                                continue;
-                            }
-
-                            let hostname = get_child_ci(staticmap, "hostname")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string());
-
-                            let cid = get_child_ci(staticmap, "cid")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string());
-
-                            let descr = get_child_ci(staticmap, "descr")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string());
-
-                            mappings.push(IscStaticMap {
-                                mac,
-                                ipaddr,
-                                hostname,
-                                cid,
-                                descr,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(mappings)
+/// Check if Kea DHCPv4 is configured (recursive search)
+pub fn has_kea_dhcp4(root: &Element) -> bool {
+    find_descendant_ci(root, "Kea")
+        .and_then(|kea| find_descendant_ci(kea, "dhcp4"))
+        .is_some()
 }
 
-/// Extract ISC DHCPv6 static mappings from the XML tree
-pub fn extract_isc_mappings_v6(root: &Element) -> Result<Vec<IscStaticMapV6>> {
-    let mut mappings = Vec::new();
-
-    // Navigate to <dhcpdv6> (case-insensitive)
-    if let Some(dhcpdv6) = get_child_ci(root, "dhcpdv6") {
-        // Iterate over all interface nodes (lan, wan, opt1, etc.)
-        for iface_node in dhcpdv6.children.iter() {
-            if let Some(iface_elem) = iface_node.as_element() {
-                // Look for staticmap children (case-insensitive)
-                for child in iface_elem.children.iter() {
-                    if let Some(staticmap) = child.as_element() {
-                        if staticmap.name.eq_ignore_ascii_case("staticmap") {
-                            let duid = get_child_ci(staticmap, "duid")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string())
-                                .unwrap_or_default();
-
-                            let ipaddr = get_child_ci(staticmap, "ipaddrv6")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string())
-                                .unwrap_or_default();
-
-                            // Skip entries without essential fields
-                            if duid.is_empty() || ipaddr.is_empty() {
-                                continue;
-                            }
-
-                            let hostname = get_child_ci(staticmap, "hostname")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string());
-
-                            let descr = get_child_ci(staticmap, "descr")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string());
-
-                            let domain_search = get_child_ci(staticmap, "domainsearchlist")
-                                .and_then(|e| e.get_text())
-                                .map(|s| s.to_string());
-
-                            mappings.push(IscStaticMapV6 {
-                                duid,
-                                ipaddr,
-                                hostname,
-                                descr,
-                                domain_search,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(mappings)
+/// Check if Kea DHCPv6 is configured (recursive search)
+pub fn has_kea_dhcp6(root: &Element) -> bool {
+    find_descendant_ci(root, "Kea")
+        .and_then(|kea| find_descendant_ci(kea, "dhcp6"))
+        .is_some()
 }
 
 /// Extract Kea subnet4 entries from the XML tree
 /// Supports two schema variations:
 /// 1. <Kea><dhcp4><subnets><subnet4>... (standard OPNsense)
 /// 2. <Kea><dhcp4><subnet4>... (fallback for plugin variations)
-pub fn extract_kea_subnets(root: &Element) -> Result<Vec<KeaSubnet>> {
+pub fn extract_kea_subnets(root: &Element) -> Result<Vec<Subnet>> {
     let mut subnets = Vec::new();
 
     // Navigate to <Kea>/<kea> (case-insensitive) -> <dhcp4>
@@ -144,9 +44,14 @@ pub fn extract_kea_subnets(root: &Element) -> Result<Vec<KeaSubnet>> {
                             if let Some(uuid) = subnet4.attributes.get("uuid") {
                                 if let Some(subnet_elem) = get_child_ci(subnet4, "subnet") {
                                     if let Some(cidr) = subnet_elem.get_text() {
-                                        subnets.push(KeaSubnet {
+                                        let iface = get_child_ci(subnet4, "interface")
+                                            .and_then(|e| e.get_text())
+                                            .map(|s| s.to_string())
+                                            .filter(|s| !s.is_empty());
+                                        subnets.push(Subnet {
                                             uuid: uuid.to_string(),
                                             cidr: cidr.to_string(),
+                                            iface,
                                         });
                                     }
                                 }
@@ -163,7 +68,7 @@ pub fn extract_kea_subnets(root: &Element) -> Result<Vec<KeaSubnet>> {
 
 /// Extract Kea subnet6 entries from the XML tree
 /// Supports <Kea><dhcp6><subnets><subnet6>
-pub fn extract_kea_subnets_v6(root: &Element) -> Result<Vec<KeaSubnetV6>> {
+pub fn extract_kea_subnets_v6(root: &Element) -> Result<Vec<SubnetV6>> {
     let mut subnets = Vec::new();
 
     if let Some(kea) = find_descendant_ci(root, "Kea") {
@@ -175,9 +80,14 @@ pub fn extract_kea_subnets_v6(root: &Element) -> Result<Vec<KeaSubnetV6>> {
                             if let Some(uuid) = subnet6.attributes.get("uuid") {
                                 if let Some(subnet_elem) = get_child_ci(subnet6, "subnet") {
                                     if let Some(cidr) = subnet_elem.get_text() {
-                                        subnets.push(KeaSubnetV6 {
+                                        let iface = get_child_ci(subnet6, "interface")
+                                            .and_then(|e| e.get_text())
+                                            .map(|s| s.to_string())
+                                            .filter(|s| !s.is_empty());
+                                        subnets.push(SubnetV6 {
                                             uuid: uuid.to_string(),
                                             cidr: cidr.to_string(),
+                                            iface,
                                         });
                                     }
                                 }

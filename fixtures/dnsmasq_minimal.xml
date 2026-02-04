@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
+  <dhcpd>
+    <lan>
+      <staticmap>
+        <mac>aa:bb:cc:dd:ee:01</mac>
+        <ipaddr>192.168.1.10</ipaddr>
+        <hostname>webserver</hostname>
+        <descr>Web Server</descr>
+      </staticmap>
+      <staticmap>
+        <mac>aa:bb:cc:dd:ee:02</mac>
+        <ipaddr>192.168.1.20</ipaddr>
+        <hostname>dbserver</hostname>
+        <cid>db-client-id</cid>
+        <descr>Database Server</descr>
+      </staticmap>
+    </lan>
+  </dhcpd>
+  <dnsmasq>
+  </dnsmasq>
+</opnsense>

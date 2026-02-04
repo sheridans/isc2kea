@@ -1,69 +1,145 @@
 # isc2kea
 
-A safe, production-ready CLI tool to migrate ISC DHCP static mappings to Kea DHCP reservations for both IPv4 and IPv6.
+An OPNsense ISC DHCP to Kea/dnsmasq migration tool for DHCPv4 and DHCPv6.
 
-**Designed for OPNsense** config.xml layouts, but may work with similar XML schemas.
+OPNsense is deprecating ISC DHCP (isc-dhcp) in favor of Kea. This tool reads your `config.xml` and migrates your ISC DHCP configuration (static mappings, subnets, ranges, and DHCP options) into Kea reservations or dnsmasq host entries. It handles both IPv4 and IPv6, and can:
 
-**Note**: This tool migrates **static mappings only** (ISC DHCP to Kea reservations) for DHCPv4 and DHCPv6. It does not migrate pools, options, DDNS, PXE, or HA/failover configurations.
+- **Migrate fixed IP assignments** (ISC static mappings to Kea reservations or dnsmasq hosts)
+- **Create subnets and ranges** in the target backend from your ISC config (`--create-subnets`)
+- **Copy DHCP options** like DNS servers, gateway, domain, and NTP (`--create-options`)
+- **Validate interfaces** to catch misconfigurations before they reach production
 
-**Tested**: Verified against a real OPNsense 25.7.11-generated `config.xml` with Kea DHCPv4/DHCPv6 subnets and ISC static mappings. XML layouts may change in future OPNsense releases; revalidate before using with newer versions.
+**It does not touch your running system.** It only reads and writes config files.
 
-## TL;DR
+## Quick Start
 
-1. Create Kea DHCPv4/DHCPv6 subnets in OPNsense first.
-2. Take a backup or snapshot
-3. Download the config.xml from OPNsense 
-4. `isc2kea scan --in ./your-config.xml`
-5. `isc2kea convert --in ./your-config.xml --out /conf/config.xml.new`
-6. Upload the config.xml back to OPNsense
+### Migrate to Kea (default)
 
-## Why This Exists
+1. **Take a snapshot or backup** of your OPNsense box before making changes.
+2. Download `config.xml` from the OPNsense UI.
+3. Kea does not need to be enabled yet. You can review the migrated config before disabling ISC DHCP and enabling Kea.
 
-OPNsense is deprecating ISC DHCP in favor of Kea. Static mappings are often the hardest part of that migration, so this open-source tool migrates IPv4/IPv6 static mappings from ISC to Kea using `config.xml`. It does not touch services or reload anything; it only adds reservations to the Kea config.
+Add `--create-subnets` to create Kea subnets from your ISC config (or create them in OPNsense first). Add `--create-options` to also copy DHCP options (DNS, gateway, NTP, etc.). Drop either flag if you don't need it.
 
-## Safety First
+```bash
+# 1. Preview what would be migrated (no changes made)
+isc2kea scan --in ./config.xml --create-subnets --create-options
 
-This tool is designed to be safe on production firewalls:
+# 2. Perform the migration
+isc2kea convert --in ./config.xml --out ./config.xml.new --create-subnets --create-options
+```
 
-- **Read-only by default** - No files are modified unless you explicitly use `convert --out`
-- **No in-place edits** - Always writes to a separate output file
-- **Fails loudly** - Aborts on ambiguity or invalid data (never auto-creates Kea sections)
-- **No subnet creation** - Kea subnets must already exist; this tool will not create them
-- **No guessing** - Requires exact subnet matches for all IP addresses
-- **Duplicate detection** - Handles messy ISC configs with duplicate IPs
-- **Case-insensitive** - Works with any tag casing: `<Kea>`/`<kea>`, `<DHCPD>`/`<dhcpd>`, etc.
-- **Schema flexible** - Supports standard and alternative Kea plugin XML structures
+### Migrate to dnsmasq
+
+1. **Take a snapshot or backup** of your OPNsense box before making changes.
+2. Download `config.xml` from the OPNsense UI.
+3. Make sure `<dnsmasq>` exists in your `config.xml`. It does not need to be enabled yet. You can review the migrated config before disabling ISC DHCP and enabling dnsmasq.
+
+Add `--create-subnets` to create dnsmasq ranges from your ISC config (or create them in OPNsense first). Add `--create-options` to also copy DHCP options. Drop either flag if you don't need it.
+
+```bash
+# 1. Preview
+isc2kea scan --in ./config.xml --backend dnsmasq --create-subnets --create-options
+
+# 2. Convert
+isc2kea convert --in ./config.xml --out ./config.xml.new --backend dnsmasq --create-subnets --create-options
+```
+
+### Then what?
+
+1. Review the new file and compare it to your original
+2. Upload `config.xml.new` via the OPNsense UI (replacing the original)
+3. Disable ISC DHCP and enable Kea (or dnsmasq) when you're happy with the config
+4. Reboot or reload the DHCP service
+5. Leases will appear after clients renew (you may need to renew or reboot clients)
+
+**Important: select your DHCP interfaces before enabling the new backend.** The tool does not configure which interfaces Kea or dnsmasq listens on. Without this, DHCP will not serve any clients.
+
+- **Kea**: Services > Kea DHCP > Settings > Interfaces
+- **dnsmasq**: Services > Dnsmasq DNS > Settings > Interfaces
+
+**Note: leases are not migrated.** The tool converts configuration only. Existing DHCP leases from ISC DHCP will not carry over — clients will request new leases from the new backend.
 
 ## Installation
+
+Download the latest binary for your platform from [GitHub Releases](https://github.com/sheridans/isc2kea/releases):
+
+| Platform | File |
+|----------|------|
+| FreeBSD x86_64 (OPNsense) | `isc2kea-freebsd-x86_64.tar.gz` |
+| Linux x86_64 | `isc2kea-linux-x86_64.tar.gz` |
+| Linux aarch64 | `isc2kea-linux-aarch64.tar.gz` |
+| macOS x86_64 | `isc2kea-macos-x86_64.tar.gz` |
+| Windows x86_64 | `isc2kea-windows-x86_64.zip` |
+
+Or build from source (requires [Rust](https://rustup.rs/)):
 
 ```bash
 cargo build --release
 ```
 
-The binary will be available at `target/release/isc2kea`.
-
-### XML Formatting Note
-
-The output XML will be reformatted (whitespace and indentation may change). This is normal and does not affect OPNsense functionality. The tool preserves all data and structure.
-
 ## Usage
 
-**Defaults**:
-- `--in` defaults to `/conf/config.xml`
+### Commands
 
-### Scan (Read-Only Analysis)
+| Command | What it does |
+|---------|-------------|
+| `scan` | Read-only preview. Shows what would be migrated without changing anything. |
+| `convert` | Performs the migration and writes the result to a new file. |
 
-Preview what would be migrated without making any changes:
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--in <path>` | Input config file. Defaults to `/conf/config.xml`. |
+| `--out <path>` | Output file (convert only). Must be different from input. |
+| `--backend <kea\|dnsmasq>` | Target DHCP backend. Defaults to `kea`. |
+| `--create-subnets` | Create subnets/ranges in the target backend from your ISC config. Without this, subnets must already exist. |
+| `--force-subnets` | Overwrite existing subnets/ranges (use with `--create-subnets`). |
+| `--create-options` | Copy DHCP options (DNS servers, gateway, etc.) from ISC to the target backend. |
+| `--force-options` | Overwrite existing DHCP options (use with `--create-options`). |
+| `--fail-if-existing` | Abort if any reservations/hosts already exist in the target backend. |
+| `--force` | Overwrite the output file if it already exists (convert only). |
+| `--verbose` | Show details for each individual mapping. |
+
+### Automatic Subnet/Range Creation (`--create-subnets`)
+
+By default, Kea subnets or dnsmasq ranges must already exist in your config before migrating. If they don't, add `--create-subnets` and the tool will create them for you based on your existing ISC DHCP config:
+
+- **Subnets** are built from each network interface's IP address and prefix length (from `<interfaces>` in your config).
+- **Pools/ranges** are copied from your ISC DHCP `<range>` entries.
+- Existing subnets are left alone. New ones are only added if they don't already exist. Use `--force-subnets` to replace existing ones instead.
 
 ```bash
-# On OPNsense (uses default /conf/config.xml)
-isc2kea scan
-
-# Or specify path explicitly
-isc2kea scan --in /conf/config.xml
+isc2kea scan --in ./config.xml --create-subnets
+isc2kea convert --in ./config.xml --out ./config.xml.new --create-subnets
 ```
 
-Output:
+### Copying DHCP Options (`--create-options`)
+
+By default, DHCP options (DNS servers, gateway, domain, etc.) are not touched. Add `--create-options` to copy them from ISC DHCP into the target backend:
+
+- Existing option values are left alone. Only missing values are filled in. Use `--force-options` to overwrite them instead.
+- **Kea**: options are attached to subnets, so `--create-options` requires Kea subnets to exist. If they don't, combine with `--create-subnets` to create them in the same run.
+- **dnsmasq**: options are independent of ranges and will be created regardless.
+
+```bash
+isc2kea scan --in ./config.xml --create-options
+isc2kea convert --in ./config.xml --out ./config.xml.new --create-options
+```
+
+Both flags can be combined:
+
+```bash
+isc2kea convert --in ./config.xml --out ./config.xml.new --backend dnsmasq --create-subnets --create-options
+```
+
+### Interface Validation
+
+The tool checks that each fixed IP assignment actually belongs to the correct network interface. For example, if a device with IP `10.0.0.50` is listed under your `lan` interface but `lan` is a `192.168.1.0/24` network, the tool will abort and tell you exactly which entry has the mismatch. This prevents devices from being silently assigned to the wrong subnet.
+
+### Sample output (scan)
+
 ```
 ISC DHCP static mappings found: 45
 ISC DHCPv6 static mappings found: 12
@@ -75,80 +151,103 @@ Reservations skipped (already exist): 2
 Reservations skipped (v6): 2
 ```
 
-For detailed output showing each mapping:
-
-```bash
-isc2kea scan --in /conf/config.xml --verbose
-```
-
-### Convert (Write to New File)
-
-Perform the migration and write to a new file:
-
-```bash
-isc2kea convert --out /tmp/config_migrated.xml
-
-# Or specify input explicitly
-isc2kea convert --in /conf/config.xml --out /tmp/config_migrated.xml
-```
-
-**Safety Features**:
-- Tool refuses if output path == input path (prevents config destruction)
-- Tool refuses if output file already exists (use `--force` to overwrite)
-- Always review the output file before deploying it
-
-**Overwriting output**:
-```bash
-isc2kea convert --out /tmp/config_migrated.xml --force
-```
-
-## Recommended Workflow
-
-1. `isc2kea scan --in /conf/config.xml`
-2. `isc2kea convert --in /conf/config.xml --out /conf/config.xml.new`
-3. Review the diff between the original and `.new` file
-4. Replace the config manually (outside the tool scope)
-
-Before running, create the required Kea DHCPv4/DHCPv6 subnets in OPNsense. The tool only adds reservations and will error if a matching Kea subnet is missing.
-
-### Abort on Existing Reservations
-
-If you want the tool to fail instead of merging when reservations already exist:
-
-```bash
-isc2kea scan --in /conf/config.xml --fail-if-existing
-isc2kea convert --in /conf/config.xml --out /tmp/config.xml --fail-if-existing
-```
-
 ## What Gets Migrated
 
-ISC DHCP static mappings under `<dhcpd>/<interface>/staticmap` are converted to Kea reservations with the following field mapping:
+### To Kea
 
-| ISC Field  | Kea Field     | Notes                          |
-|------------|---------------|--------------------------------|
-| mac        | hw_address    | MAC address                    |
-| ipaddr     | ip_address    | IPv4 address                   |
-| hostname   | hostname      | Primary hostname               |
-| cid        | hostname      | Used if hostname not present   |
-| descr      | description   | Description text               |
+Your ISC DHCP fixed assignments become Kea reservations. Each one is automatically matched to the correct Kea subnet based on its IP address.
 
-Each reservation is automatically linked to the correct Kea subnet by matching the IP address against subnet CIDRs.
+**IPv4:**
 
-ISC DHCPv6 static mappings under `<dhcpdv6>/<interface>/staticmap` are converted to Kea DHCPv6 reservations with the following field mapping:
+| ISC field | Kea field | What it is |
+|-----------|-----------|------------|
+| mac | hw_address | Device MAC address |
+| ipaddr | ip_address | Fixed IPv4 address |
+| hostname | hostname | Device name |
+| cid | hostname | Used as hostname if hostname is empty |
+| descr | description | Description |
 
-| ISC Field         | Kea Field     | Notes                      |
-|-------------------|---------------|----------------------------|
-| duid              | duid          | DHCPv6 DUID                |
-| ipaddrv6          | ip_address    | IPv6 address               |
-| hostname          | hostname      | Primary hostname           |
-| descr             | description   | Description text           |
-| domainsearchlist  | domain_search | Domain search list         |
+**IPv6:**
 
-Each DHCPv6 reservation is linked to the correct Kea DHCPv6 subnet by matching the IPv6 address against subnet CIDRs.
+| ISC field | Kea field | What it is |
+|-----------|-----------|------------|
+| duid | duid | Device unique ID (DHCPv6) |
+| ipaddrv6 | ip_address | Fixed IPv6 address |
+| hostname | hostname | Device name |
+| descr | description | Description |
+| domainsearchlist | domain_search | DNS search domains |
+
+### To dnsmasq
+
+Your ISC DHCP fixed assignments become dnsmasq host entries. No subnet matching is needed since dnsmasq uses a flat list.
+
+| ISC field | dnsmasq field | What it is |
+|-----------|---------------|------------|
+| mac | hwaddr | Device MAC address |
+| ipaddr | ip | Fixed IP address |
+| hostname | host | Device name |
+| cid | client_id | Client identifier |
+| descr | descr | Description |
+
+IPv6 entries are also supported when a DUID is present.
+
+### DHCP Options (with `--create-options`)
+
+The following DHCP options can be copied from ISC to Kea or dnsmasq:
+
+**IPv4:** DNS servers, gateway, domain name, domain search list, NTP servers
+
+**IPv6:** DNS servers, domain search list
+
+dnsmasq option mapping:
+
+| ISC field | dnsmasq option code |
+|-----------|---------------------|
+| DHCPv4 `dnsserver` | 6 |
+| DHCPv4 `gateway` | 3 |
+| DHCPv4 `domain` | 15 |
+| DHCPv4 `domainsearchlist` | 119 |
+| DHCPv4 `ntpserver` | 42 |
+| DHCPv6 `dnsserver` | option6 23 |
+| DHCPv6 `domainsearchlist` | option6 24 |
+
+
+## How It Handles Conflicts
+
+- **Duplicates are skipped.** If a reservation or host already exists with the same IP, MAC, or DUID, it won't be duplicated. The tool tells you how many were skipped.
+- **Subnets are add-only.** With `--create-subnets`, existing subnets are left alone (unless you also use `--force-subnets`).
+- **Options are add-only.** With `--create-options`, existing option values are left alone (unless you also use `--force-options`).
+
+## Safety
+
+- **Nothing changes unless you run `convert --out`**. `scan` is always read-only.
+- **Never overwrites your input**. Refuses to write to the same file you read from.
+- **Never overwrites existing output**. Refuses if the output file exists (unless you use `--force`).
+- **Interface validation**. Checks that each device's IP actually belongs to the network interface it's listed under. Aborts if there's a mismatch, so you never accidentally put a device on the wrong subnet.
+- **Validates everything**. Checks that IPs match subnets and that the target backend is actually configured. Aborts on any problem.
+- **Works with messy configs**. Handles duplicate entries, mixed tag casing (`<Kea>`/`<kea>`), and different Kea plugin XML structures.
+
+## Limitations
+
+**Not migrated (out of scope):**
+- DDNS settings
+- PXE/boot options
+- HA/failover configuration
+
+**Not yet supported:**
+- Prefix delegation (`prefixrange`) is ignored during subnet creation
+- dnsmasq `type=match` DHCP options are not migrated. Only `type=set` options are supported. OPNsense uses `match`/`set` pairs for tag-based option assignment; only the `set` (value) side is handled.
+- DHCP options: static routes, classless static routes, TFTP/boot, and time servers
+- IPv6 interfaces using `track6` or `dhcp6` addressing are skipped (no static CIDR to derive)
+- ISC entries missing required fields (e.g. no MAC or no IP) are silently skipped
+
+**Opt-in only (not migrated by default):**
+- DHCP pools/ranges (use `--create-subnets`)
+- DHCP options (use `--create-options`)
 
 ## Example Output
 
-DHCPv4 reservation:
+### Kea DHCPv4 reservation
 
 ```xml
 <reservation uuid="...">
@@ -159,7 +258,7 @@ DHCPv4 reservation:
 </reservation>
 ```
 
-DHCPv6 reservation:
+### Kea DHCPv6 reservation
 
 ```xml
 <reservation uuid="...">
@@ -172,35 +271,26 @@ DHCPv6 reservation:
 </reservation>
 ```
 
-## What Does NOT Get Migrated
+### dnsmasq host entry
 
-- DHCP pools/ranges
-- DHCP options
-- DDNS settings
-- PXE/boot options
-- HA/failover configuration
+```xml
+<hosts uuid="...">
+  <hwaddr>08:62:66:27:a9:45</hwaddr>
+  <ip>10.10.10.101</ip>
+  <host>arch</host>
+  <descr>my workstation</descr>
+  <domain></domain>
+  <local>0</local>
+  <ignore>0</ignore>
+</hosts>
+```
 
-## Conflict Handling
+## Notes
 
-If a Kea reservation already exists with the same IP address, it will be **skipped** (not duplicated). For DHCPv6, existing DUIDs are also treated as duplicates and skipped. The tool reports how many reservations were skipped.
-
-## Error Handling
-
-The tool will **abort** and report an error if:
-
-- An IP address doesn't match any Kea subnet
-- The XML is malformed
-- Required fields are missing
-
-When multiple subnets overlap, the most specific prefix is selected (largest prefix length).
-
-## Technical Details
-
-- **Language**: Rust
-- **XML Handling**: Preserves document structure using xmltree
-- **Subnet Matching**: Proper CIDR containment checks using ipnet
-- **Kea Lookup**: Recursively searches for `<Kea>`/`<dhcp4>` to support nested configs
-- **UUID Generation**: Auto-generates UUIDs for new reservations
+- The output XML may have different whitespace/indentation than the original. This is cosmetic and does not affect OPNsense.
+- When multiple subnets overlap, the most specific one (longest prefix) is used.
+- Tested against real OPNsense `config.xml` files from 25.7 and 26.1. An example config from a live OPNsense 25.7.11 system is included in `example/live.xml`.
+- XML layouts may change in future OPNsense releases; revalidate before using with newer versions.
 
 ## License
 
@@ -208,4 +298,6 @@ BSD 2-Clause License - see LICENSE file for details.
 
 ## Support
 
-If this tool saves you time, feel free to buy me a coffee: https://buymeacoffee.com/sheridans
+If this tool saves you time, feel free to buy me a coffee:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/sheridans)
