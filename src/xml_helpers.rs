@@ -55,16 +55,3 @@ pub(crate) fn find_mut_descendant_ci<'a>(
     }
     None
 }
-
-/// Check if Kea DHCPv4 is configured (recursive search)
-pub(crate) fn has_kea_dhcp4(root: &Element) -> bool {
-    find_descendant_ci(root, "Kea")
-        .and_then(|kea| find_descendant_ci(kea, "dhcp4"))
-        .is_some()
-}
-
-pub(crate) fn has_kea_dhcp6(root: &Element) -> bool {
-    find_descendant_ci(root, "Kea")
-        .and_then(|kea| find_descendant_ci(kea, "dhcp6"))
-        .is_some()
-}

@@ -9,7 +9,7 @@ use std::process;
 #[derive(Parser)]
 #[command(
     name = "isc2kea",
-    about = "Migrate ISC DHCP static mappings to Kea DHCP reservations",
+    about = "Migrate ISC DHCP static mappings to Kea/dnsmasq DHCP configurations",
     long_about = "Designed for OPNsense config.xml but may work with similar XML schemas."
 )]
 struct Cli {
@@ -25,7 +25,11 @@ enum Commands {
         #[arg(short, long, default_value = "/conf/config.xml")]
         r#in: PathBuf,
 
-        /// Abort if any Kea reservations already exist
+        /// Target DHCP backend
+        #[arg(short, long, value_enum, default_value_t = isc2kea::Backend::Kea)]
+        backend: isc2kea::Backend,
+
+        /// Abort if any existing reservations/hosts are found
         #[arg(long)]
         fail_if_existing: bool,
 
@@ -34,17 +38,21 @@ enum Commands {
         verbose: bool,
     },
 
-    /// Convert ISC mappings to Kea reservations and write to output file
+    /// Convert ISC mappings to target backend format and write to output file
     Convert {
         /// Input config.xml file path
         #[arg(short, long, default_value = "/conf/config.xml")]
         r#in: PathBuf,
 
+        /// Target DHCP backend
+        #[arg(short, long, value_enum, default_value_t = isc2kea::Backend::Kea)]
+        backend: isc2kea::Backend,
+
         /// Output file path for converted XML
         #[arg(short, long)]
         out: PathBuf,
 
-        /// Abort if any Kea reservations already exist
+        /// Abort if any existing reservations/hosts are found
         #[arg(long)]
         fail_if_existing: bool,
 
@@ -71,6 +79,7 @@ fn run() -> Result<()> {
     match cli.command {
         Commands::Scan {
             r#in,
+            backend,
             fail_if_existing,
             verbose,
         } => {
@@ -83,6 +92,7 @@ fn run() -> Result<()> {
             let options = isc2kea::MigrationOptions {
                 fail_if_existing,
                 verbose,
+                backend: backend.clone(),
             };
 
             let stats = match isc2kea::scan_config(Cursor::new(&buffer), &options) {
@@ -91,29 +101,13 @@ fn run() -> Result<()> {
                     if let Some(migration_error) = e.downcast_ref::<isc2kea::MigrationError>() {
                         if matches!(
                             migration_error,
-                            isc2kea::MigrationError::KeaNotConfigured
-                                | isc2kea::MigrationError::NoKeaSubnets
-                                | isc2kea::MigrationError::KeaV6NotConfigured
-                                | isc2kea::MigrationError::NoKeaSubnetsV6
+                            isc2kea::MigrationError::BackendNotConfigured { .. }
+                                | isc2kea::MigrationError::NoBackendSubnets { .. }
+                                | isc2kea::MigrationError::BackendV6NotConfigured { .. }
+                                | isc2kea::MigrationError::NoBackendSubnetsV6 { .. }
                         ) {
                             if let Ok(stats) = isc2kea::scan_counts(Cursor::new(&buffer)) {
-                                println!(
-                                    "ISC DHCP static mappings found: {}",
-                                    stats.isc_mappings_found
-                                );
-                                println!(
-                                    "ISC DHCPv6 static mappings found: {}",
-                                    stats.isc_mappings_v6_found
-                                );
-                                println!("Kea subnet4 entries found: {}", stats.kea_subnets_found);
-                                println!(
-                                    "Kea subnet6 entries found: {}",
-                                    stats.kea_subnets_v6_found
-                                );
-                                println!("Reservations that would be created: 0");
-                                println!("Reservations (v6) that would be created: 0");
-                                println!("Reservations skipped (already exist): 0");
-                                println!("Reservations skipped (v6): 0");
+                                print_scan_stats(&stats, &backend);
                             }
                         }
                     }
@@ -122,36 +116,12 @@ fn run() -> Result<()> {
                 }
             };
 
-            println!(
-                "ISC DHCP static mappings found: {}",
-                stats.isc_mappings_found
-            );
-            println!(
-                "ISC DHCPv6 static mappings found: {}",
-                stats.isc_mappings_v6_found
-            );
-            println!("Kea subnet4 entries found: {}", stats.kea_subnets_found);
-            println!("Kea subnet6 entries found: {}", stats.kea_subnets_v6_found);
-            println!(
-                "Reservations that would be created: {}",
-                stats.reservations_to_create
-            );
-            println!(
-                "Reservations (v6) that would be created: {}",
-                stats.reservations_v6_to_create
-            );
-            println!(
-                "Reservations skipped (already exist): {}",
-                stats.reservations_skipped
-            );
-            println!(
-                "Reservations skipped (v6): {}",
-                stats.reservations_v6_skipped
-            );
+            print_scan_stats(&stats, &backend);
         }
 
         Commands::Convert {
             r#in,
+            backend,
             out,
             fail_if_existing,
             verbose,
@@ -227,37 +197,83 @@ fn run() -> Result<()> {
             let options = isc2kea::MigrationOptions {
                 fail_if_existing,
                 verbose,
+                backend: backend.clone(),
             };
 
             let stats = isc2kea::convert_config(input_file, output_file, &options)?;
 
             println!("\nMigration completed successfully!");
-            println!(
-                "ISC DHCP static mappings found: {}",
-                stats.isc_mappings_found
-            );
-            println!(
-                "ISC DHCPv6 static mappings found: {}",
-                stats.isc_mappings_v6_found
-            );
-            println!("Kea subnet4 entries found: {}", stats.kea_subnets_found);
-            println!("Kea subnet6 entries found: {}", stats.kea_subnets_v6_found);
-            println!("Reservations created: {}", stats.reservations_to_create);
-            println!(
-                "Reservations created (v6): {}",
-                stats.reservations_v6_to_create
-            );
-            println!(
-                "Reservations skipped (already exist): {}",
-                stats.reservations_skipped
-            );
-            println!(
-                "Reservations skipped (v6): {}",
-                stats.reservations_v6_skipped
-            );
+            print_convert_stats(&stats, &backend);
             println!("Output written to: {}", out.display());
         }
     }
 
     Ok(())
+}
+
+fn print_scan_stats(stats: &isc2kea::MigrationStats, backend: &isc2kea::Backend) {
+    println!(
+        "ISC DHCP static mappings found: {}",
+        stats.isc_mappings_found
+    );
+    println!(
+        "ISC DHCPv6 static mappings found: {}",
+        stats.isc_mappings_v6_found
+    );
+    println!(
+        "{} subnet4 entries found: {}",
+        backend, stats.target_subnets_found
+    );
+    println!(
+        "{} subnet6 entries found: {}",
+        backend, stats.target_subnets_v6_found
+    );
+    println!(
+        "Reservations that would be created: {}",
+        stats.reservations_to_create
+    );
+    println!(
+        "Reservations (v6) that would be created: {}",
+        stats.reservations_v6_to_create
+    );
+    println!(
+        "Reservations skipped (already exist): {}",
+        stats.reservations_skipped
+    );
+    println!(
+        "Reservations skipped (v6): {}",
+        stats.reservations_v6_skipped
+    );
+}
+
+fn print_convert_stats(stats: &isc2kea::MigrationStats, backend: &isc2kea::Backend) {
+    println!(
+        "ISC DHCP static mappings found: {}",
+        stats.isc_mappings_found
+    );
+    println!(
+        "ISC DHCPv6 static mappings found: {}",
+        stats.isc_mappings_v6_found
+    );
+    println!(
+        "{} subnet4 entries found: {}",
+        backend, stats.target_subnets_found
+    );
+    println!(
+        "{} subnet6 entries found: {}",
+        backend, stats.target_subnets_v6_found
+    );
+    println!("Reservations created: {}", stats.reservations_to_create);
+    println!(
+        "Reservations created (v6): {}",
+        stats.reservations_v6_to_create
+    );
+    println!(
+        "Reservations skipped (already exist): {}",
+        stats.reservations_skipped
+    );
+    println!(
+        "Reservations skipped (v6): {}",
+        stats.reservations_v6_skipped
+    );
 }

@@ -17,31 +17,37 @@ pub struct IscStaticMapV6 {
 }
 
 #[derive(Debug, Clone)]
-pub struct KeaSubnet {
+pub struct Subnet {
     pub uuid: String,
     pub cidr: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct KeaSubnetV6 {
+pub struct SubnetV6 {
     pub uuid: String,
     pub cidr: String,
 }
+
+pub type KeaSubnet = Subnet;
+pub type KeaSubnetV6 = SubnetV6;
 
 #[derive(Debug)]
 pub struct MigrationStats {
     pub isc_mappings_found: usize,
     pub isc_mappings_v6_found: usize,
-    pub kea_subnets_found: usize,
-    pub kea_subnets_v6_found: usize,
+    pub target_subnets_found: usize,
+    pub target_subnets_v6_found: usize,
     pub reservations_to_create: usize,
     pub reservations_v6_to_create: usize,
     pub reservations_skipped: usize,
     pub reservations_v6_skipped: usize,
 }
 
+use crate::backend::Backend;
+
 #[derive(Debug, Clone, Default)]
 pub struct MigrationOptions {
     pub fail_if_existing: bool,
     pub verbose: bool,
+    pub backend: Backend,
 }

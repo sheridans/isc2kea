@@ -3,7 +3,7 @@ use ipnet::{Ipv4Net, Ipv6Net};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 
-use crate::{KeaSubnet, KeaSubnetV6, MigrationError};
+use crate::{MigrationError, Subnet, SubnetV6};
 
 /// Check if an IP address is contained within a CIDR subnet
 pub fn ip_in_subnet(ip: &str, cidr: &str) -> Result<bool> {
@@ -17,7 +17,7 @@ pub fn ip_in_subnet(ip: &str, cidr: &str) -> Result<bool> {
 }
 
 /// Find the matching subnet UUID for an IP address
-pub fn find_subnet_for_ip(ip: &str, subnets: &[KeaSubnet]) -> Result<String> {
+pub fn find_subnet_for_ip(ip: &str, subnets: &[Subnet]) -> Result<String> {
     let ip_addr =
         Ipv4Addr::from_str(ip).map_err(|_| MigrationError::InvalidIpAddress(ip.to_string()))?;
 
@@ -51,7 +51,7 @@ pub fn ip_in_subnet_v6(ip: &str, cidr: &str) -> Result<bool> {
 }
 
 /// Find the matching IPv6 subnet UUID for an IP address
-pub fn find_subnet_for_ip_v6(ip: &str, subnets: &[KeaSubnetV6]) -> Result<String> {
+pub fn find_subnet_for_ip_v6(ip: &str, subnets: &[SubnetV6]) -> Result<String> {
     let ip_addr =
         Ipv6Addr::from_str(ip).map_err(|_| MigrationError::InvalidIpAddress(ip.to_string()))?;
 
@@ -96,11 +96,11 @@ mod tests {
     #[test]
     fn test_find_subnet_for_ip() {
         let subnets = vec![
-            KeaSubnet {
+            Subnet {
                 uuid: "subnet-1".to_string(),
                 cidr: "192.168.1.0/24".to_string(),
             },
-            KeaSubnet {
+            Subnet {
                 uuid: "subnet-2".to_string(),
                 cidr: "10.0.0.0/8".to_string(),
             },
@@ -121,17 +121,17 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("does not match any Kea subnet"));
+            .contains("does not match any configured subnet"));
     }
 
     #[test]
     fn test_find_subnet_for_ip_most_specific() {
         let subnets = vec![
-            KeaSubnet {
+            Subnet {
                 uuid: "subnet-wide".to_string(),
                 cidr: "10.0.0.0/16".to_string(),
             },
-            KeaSubnet {
+            Subnet {
                 uuid: "subnet-narrow".to_string(),
                 cidr: "10.0.1.0/24".to_string(),
             },
@@ -154,11 +154,11 @@ mod tests {
     #[test]
     fn test_find_subnet_for_ip_v6() {
         let subnets = vec![
-            KeaSubnetV6 {
+            SubnetV6 {
                 uuid: "subnet-6a".to_string(),
                 cidr: "2001:db8:42::/64".to_string(),
             },
-            KeaSubnetV6 {
+            SubnetV6 {
                 uuid: "subnet-6b".to_string(),
                 cidr: "fd00:abcd::/64".to_string(),
             },
@@ -178,17 +178,17 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("does not match any Kea subnet"));
+            .contains("does not match any configured subnet"));
     }
 
     #[test]
     fn test_find_subnet_for_ip_v6_most_specific() {
         let subnets = vec![
-            KeaSubnetV6 {
+            SubnetV6 {
                 uuid: "subnet-wide".to_string(),
                 cidr: "2001:db8::/48".to_string(),
             },
-            KeaSubnetV6 {
+            SubnetV6 {
                 uuid: "subnet-narrow".to_string(),
                 cidr: "2001:db8:abcd::/64".to_string(),
             },

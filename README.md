@@ -1,25 +1,36 @@
 # isc2kea
 
-A safe, production-ready CLI tool to migrate ISC DHCP static mappings to Kea DHCP reservations for both IPv4 and IPv6.
+A safe, production-ready CLI tool to migrate ISC DHCP static mappings to Kea DHCP reservations or dnsmasq host entries for both IPv4 and IPv6.
 
 **Designed for OPNsense** config.xml layouts, but may work with similar XML schemas.
 
-**Note**: This tool migrates **static mappings only** (ISC DHCP to Kea reservations) for DHCPv4 and DHCPv6. It does not migrate pools, options, DDNS, PXE, or HA/failover configurations.
+**Note**: This tool migrates **static mappings only** (ISC DHCP to Kea reservations or dnsmasq hosts) for DHCPv4 and DHCPv6. It does not migrate pools, options, DDNS, PXE, or HA/failover configurations.
 
 **Tested**: Verified against a real OPNsense 25.7.11-generated `config.xml` with Kea DHCPv4/DHCPv6 subnets and ISC static mappings. XML layouts may change in future OPNsense releases; revalidate before using with newer versions.
 
 ## TL;DR
 
+### Migrate to Kea (default)
+
 1. Create Kea DHCPv4/DHCPv6 subnets in OPNsense first.
 2. Take a backup or snapshot
-3. Download the config.xml from OPNsense 
+3. Download the config.xml from OPNsense
 4. `isc2kea scan --in ./your-config.xml`
 5. `isc2kea convert --in ./your-config.xml --out /conf/config.xml.new`
 6. Upload the config.xml back to OPNsense
 
+### Migrate to dnsmasq
+
+1. Enable dnsmasq in OPNsense first.
+2. Take a backup or snapshot
+3. Download the config.xml from OPNsense
+4. `isc2kea scan --in ./your-config.xml --backend dnsmasq`
+5. `isc2kea convert --in ./your-config.xml --out /conf/config.xml.new --backend dnsmasq`
+6. Upload the config.xml back to OPNsense
+
 ## Why This Exists
 
-OPNsense is deprecating ISC DHCP in favor of Kea. Static mappings are often the hardest part of that migration, so this open-source tool migrates IPv4/IPv6 static mappings from ISC to Kea using `config.xml`. It does not touch services or reload anything; it only adds reservations to the Kea config.
+OPNsense is deprecating ISC DHCP in favor of Kea. Static mappings are often the hardest part of that migration, so this open-source tool migrates IPv4/IPv6 static mappings from ISC to Kea or dnsmasq using `config.xml`. It does not touch services or reload anything; it only adds reservations/hosts to the target backend config.
 
 ## Safety First
 
@@ -27,10 +38,10 @@ This tool is designed to be safe on production firewalls:
 
 - **Read-only by default** - No files are modified unless you explicitly use `convert --out`
 - **No in-place edits** - Always writes to a separate output file
-- **Fails loudly** - Aborts on ambiguity or invalid data (never auto-creates Kea sections)
+- **Fails loudly** - Aborts on ambiguity or invalid data (never auto-creates backend sections)
 - **No subnet creation** - Kea subnets must already exist; this tool will not create them
-- **No guessing** - Requires exact subnet matches for all IP addresses
-- **Duplicate detection** - Handles messy ISC configs with duplicate IPs
+- **No guessing** - Requires exact subnet matches for all IP addresses (Kea backend)
+- **Duplicate detection** - Handles messy ISC configs with duplicate IPs and MACs
 - **Case-insensitive** - Works with any tag casing: `<Kea>`/`<kea>`, `<DHCPD>`/`<dhcpd>`, etc.
 - **Schema flexible** - Supports standard and alternative Kea plugin XML structures
 
@@ -50,6 +61,20 @@ The output XML will be reformatted (whitespace and indentation may change). This
 
 **Defaults**:
 - `--in` defaults to `/conf/config.xml`
+- `--backend` defaults to `kea`
+
+### Backend Selection
+
+Use `--backend` (or `-b`) to choose the target DHCP backend:
+
+```bash
+# Kea (default)
+isc2kea scan --in /conf/config.xml
+isc2kea scan --in /conf/config.xml --backend kea
+
+# dnsmasq
+isc2kea scan --in /conf/config.xml --backend dnsmasq
+```
 
 ### Scan (Read-Only Analysis)
 
@@ -61,6 +86,9 @@ isc2kea scan
 
 # Or specify path explicitly
 isc2kea scan --in /conf/config.xml
+
+# Scan for dnsmasq migration
+isc2kea scan --in /conf/config.xml --backend dnsmasq
 ```
 
 Output:
@@ -86,7 +114,11 @@ isc2kea scan --in /conf/config.xml --verbose
 Perform the migration and write to a new file:
 
 ```bash
+# Kea (default)
 isc2kea convert --out /tmp/config_migrated.xml
+
+# dnsmasq
+isc2kea convert --out /tmp/config_migrated.xml --backend dnsmasq
 
 # Or specify input explicitly
 isc2kea convert --in /conf/config.xml --out /tmp/config_migrated.xml
@@ -109,7 +141,7 @@ isc2kea convert --out /tmp/config_migrated.xml --force
 3. Review the diff between the original and `.new` file
 4. Replace the config manually (outside the tool scope)
 
-Before running, create the required Kea DHCPv4/DHCPv6 subnets in OPNsense. The tool only adds reservations and will error if a matching Kea subnet is missing.
+Before running, create the required Kea DHCPv4/DHCPv6 subnets (or enable dnsmasq) in OPNsense. The tool only adds reservations/hosts and will error if the target backend is not configured.
 
 ### Abort on Existing Reservations
 
@@ -121,6 +153,8 @@ isc2kea convert --in /conf/config.xml --out /tmp/config.xml --fail-if-existing
 ```
 
 ## What Gets Migrated
+
+### Kea Backend (default)
 
 ISC DHCP static mappings under `<dhcpd>/<interface>/staticmap` are converted to Kea reservations with the following field mapping:
 
@@ -146,9 +180,23 @@ ISC DHCPv6 static mappings under `<dhcpdv6>/<interface>/staticmap` are converted
 
 Each DHCPv6 reservation is linked to the correct Kea DHCPv6 subnet by matching the IPv6 address against subnet CIDRs.
 
+### dnsmasq Backend
+
+ISC DHCP static mappings are converted to dnsmasq host entries under `<dnsmasq><hosts>`:
+
+| ISC Field  | dnsmasq Field | Notes                          |
+|------------|---------------|--------------------------------|
+| mac        | hwaddr        | MAC address                    |
+| ipaddr     | ip            | IPv4 address                   |
+| hostname   | host          | Primary hostname               |
+| cid        | client_id     | Client identifier              |
+| descr      | descr         | Description text               |
+
+dnsmasq hosts are flat entries (no subnet association required). IPv6 mappings are supported via `client_id` (DUID) when present.
+
 ## Example Output
 
-DHCPv4 reservation:
+### Kea DHCPv4 reservation
 
 ```xml
 <reservation uuid="...">
@@ -159,7 +207,7 @@ DHCPv4 reservation:
 </reservation>
 ```
 
-DHCPv6 reservation:
+### Kea DHCPv6 reservation
 
 ```xml
 <reservation uuid="...">
@@ -172,6 +220,20 @@ DHCPv6 reservation:
 </reservation>
 ```
 
+### dnsmasq host entry
+
+```xml
+<hosts uuid="...">
+  <hwaddr>08:62:66:27:a9:45</hwaddr>
+  <ip>10.10.10.101</ip>
+  <host>arch</host>
+  <descr>my workstation</descr>
+  <domain></domain>
+  <local>0</local>
+  <ignore>0</ignore>
+</hosts>
+```
+
 ## What Does NOT Get Migrated
 
 - DHCP pools/ranges
@@ -182,25 +244,30 @@ DHCPv6 reservation:
 
 ## Conflict Handling
 
-If a Kea reservation already exists with the same IP address, it will be **skipped** (not duplicated). For DHCPv6, existing DUIDs are also treated as duplicates and skipped. The tool reports how many reservations were skipped.
+**Kea**: If a reservation already exists with the same IP address, it will be **skipped** (not duplicated). For DHCPv6, existing DUIDs are also treated as duplicates and skipped.
+
+**dnsmasq**: If a host entry already exists with the same IP address, MAC address, or client_id (DUID), it will be **skipped**.
+
+The tool reports how many entries were skipped.
 
 ## Error Handling
 
 The tool will **abort** and report an error if:
 
-- An IP address doesn't match any Kea subnet
+- An IP address doesn't match any Kea subnet (Kea backend)
+- The target backend is not configured in config.xml
 - The XML is malformed
 - Required fields are missing
 
-When multiple subnets overlap, the most specific prefix is selected (largest prefix length).
+When multiple subnets overlap (Kea), the most specific prefix is selected (largest prefix length).
 
 ## Technical Details
 
 - **Language**: Rust
 - **XML Handling**: Preserves document structure using xmltree
-- **Subnet Matching**: Proper CIDR containment checks using ipnet
-- **Kea Lookup**: Recursively searches for `<Kea>`/`<dhcp4>` to support nested configs
-- **UUID Generation**: Auto-generates UUIDs for new reservations
+- **Subnet Matching**: Proper CIDR containment checks using ipnet (Kea backend)
+- **Backend Dispatch**: Enum-based dispatch for clean separation of Kea and dnsmasq logic
+- **UUID Generation**: Auto-generates UUIDs for new reservations/hosts
 
 ## License
 

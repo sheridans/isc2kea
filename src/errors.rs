@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum MigrationError {
-    #[error("IP address {0} does not match any Kea subnet")]
+    #[error("IP address {0} does not match any configured subnet")]
     NoMatchingSubnet(String),
 
     #[error("Invalid IP address: {0}")]
@@ -11,18 +11,23 @@ pub enum MigrationError {
     #[error("Invalid CIDR notation: {0}")]
     InvalidCidr(String),
 
-    #[error("Kea DHCPv4 not configured in config.xml. Please configure Kea subnets first.")]
-    KeaNotConfigured,
-
-    #[error("No Kea subnets found. Please configure at least one Kea subnet before migration.")]
-    NoKeaSubnets,
-
-    #[error("Kea DHCPv6 not configured in config.xml. Please configure Kea DHCPv6 first.")]
-    KeaV6NotConfigured,
+    #[error("{backend} DHCPv4 not configured in config.xml. Please configure {backend} first.")]
+    BackendNotConfigured { backend: String },
 
     #[error(
-        "No Kea DHCPv6 subnets found. Please configure at least one Kea DHCPv6 subnet before \
+        "No {backend} subnets found. Please configure at least one {backend} subnet before \
          migration."
     )]
-    NoKeaSubnetsV6,
+    NoBackendSubnets { backend: String },
+
+    #[error(
+        "{backend} DHCPv6 not configured in config.xml. Please configure {backend} DHCPv6 first."
+    )]
+    BackendV6NotConfigured { backend: String },
+
+    #[error(
+        "No {backend} DHCPv6 subnets found. Please configure at least one {backend} DHCPv6 \
+         subnet before migration."
+    )]
+    NoBackendSubnetsV6 { backend: String },
 }

@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<opnsense>
+  <dnsmasq>
+    <hosts>
+      <host>ipv6examplehost</host>
+      <domain>example.com</domain>
+      <local>0</local>
+      <ip>fd00:1234:5678:1::101</ip>
+      <client_id>00:01:00:01:aa:bb:cc:dd:00:11:22:33:44:55</client_id>
+      <hwaddr></hwaddr>
+      <descr>test ipv6 static mapping</descr>
+      <lease_time></lease_time>
+      <cnames></cnames>
+      <ignore>0</ignore>
+      <set_tag></set_tag>
+      <comments></comments>
+      <aliases></aliases>
+    </hosts>
+  </dnsmasq>
+</opnsense>

@@ -3,7 +3,21 @@ use std::collections::HashSet;
 use xmltree::Element;
 
 use crate::xml_helpers::{find_descendant_ci, get_child_ci};
-use crate::{IscStaticMap, IscStaticMapV6, KeaSubnet, KeaSubnetV6};
+use crate::{IscStaticMap, IscStaticMapV6, Subnet, SubnetV6};
+
+/// Check if Kea DHCPv4 is configured (recursive search)
+pub(crate) fn has_kea_dhcp4(root: &Element) -> bool {
+    find_descendant_ci(root, "Kea")
+        .and_then(|kea| find_descendant_ci(kea, "dhcp4"))
+        .is_some()
+}
+
+/// Check if Kea DHCPv6 is configured (recursive search)
+pub(crate) fn has_kea_dhcp6(root: &Element) -> bool {
+    find_descendant_ci(root, "Kea")
+        .and_then(|kea| find_descendant_ci(kea, "dhcp6"))
+        .is_some()
+}
 
 /// Extract ISC static mappings from the XML tree
 pub fn extract_isc_mappings(root: &Element) -> Result<Vec<IscStaticMap>> {
@@ -123,7 +137,7 @@ pub fn extract_isc_mappings_v6(root: &Element) -> Result<Vec<IscStaticMapV6>> {
 /// Supports two schema variations:
 /// 1. <Kea><dhcp4><subnets><subnet4>... (standard OPNsense)
 /// 2. <Kea><dhcp4><subnet4>... (fallback for plugin variations)
-pub fn extract_kea_subnets(root: &Element) -> Result<Vec<KeaSubnet>> {
+pub fn extract_kea_subnets(root: &Element) -> Result<Vec<Subnet>> {
     let mut subnets = Vec::new();
 
     // Navigate to <Kea>/<kea> (case-insensitive) -> <dhcp4>
@@ -144,7 +158,7 @@ pub fn extract_kea_subnets(root: &Element) -> Result<Vec<KeaSubnet>> {
                             if let Some(uuid) = subnet4.attributes.get("uuid") {
                                 if let Some(subnet_elem) = get_child_ci(subnet4, "subnet") {
                                     if let Some(cidr) = subnet_elem.get_text() {
-                                        subnets.push(KeaSubnet {
+                                        subnets.push(Subnet {
                                             uuid: uuid.to_string(),
                                             cidr: cidr.to_string(),
                                         });
@@ -163,7 +177,7 @@ pub fn extract_kea_subnets(root: &Element) -> Result<Vec<KeaSubnet>> {
 
 /// Extract Kea subnet6 entries from the XML tree
 /// Supports <Kea><dhcp6><subnets><subnet6>
-pub fn extract_kea_subnets_v6(root: &Element) -> Result<Vec<KeaSubnetV6>> {
+pub fn extract_kea_subnets_v6(root: &Element) -> Result<Vec<SubnetV6>> {
     let mut subnets = Vec::new();
 
     if let Some(kea) = find_descendant_ci(root, "Kea") {
@@ -175,7 +189,7 @@ pub fn extract_kea_subnets_v6(root: &Element) -> Result<Vec<KeaSubnetV6>> {
                             if let Some(uuid) = subnet6.attributes.get("uuid") {
                                 if let Some(subnet_elem) = get_child_ci(subnet6, "subnet") {
                                     if let Some(cidr) = subnet_elem.get_text() {
-                                        subnets.push(KeaSubnetV6 {
+                                        subnets.push(SubnetV6 {
                                             uuid: uuid.to_string(),
                                             cidr: cidr.to_string(),
                                         });

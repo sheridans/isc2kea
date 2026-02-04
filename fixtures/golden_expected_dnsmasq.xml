@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<opnsense>
+  <dnsmasq>
+    <hosts>
+      <hwaddr>aa:bb:cc:dd:ee:01</hwaddr>
+      <ip>192.168.1.10</ip>
+      <host>webserver</host>
+      <descr>Web Server</descr>
+      <domain></domain>
+      <local>0</local>
+      <ignore>0</ignore>
+      <lease_time></lease_time>
+      <cnames></cnames>
+      <set_tag></set_tag>
+      <comments></comments>
+      <aliases></aliases>
+    </hosts>
+    <hosts>
+      <hwaddr>aa:bb:cc:dd:ee:02</hwaddr>
+      <ip>192.168.1.20</ip>
+      <host>dbserver</host>
+      <client_id>db-client-id</client_id>
+      <descr>Database Server</descr>
+      <domain></domain>
+      <local>0</local>
+      <ignore>0</ignore>
+      <lease_time></lease_time>
+      <cnames></cnames>
+      <set_tag></set_tag>
+      <comments></comments>
+      <aliases></aliases>
+    </hosts>
+  </dnsmasq>
+</opnsense>
