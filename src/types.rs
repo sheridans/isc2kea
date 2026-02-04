@@ -1,5 +1,6 @@
 #[derive(Debug, Clone)]
 pub struct IscStaticMap {
+    pub iface: String,
     pub mac: String,
     pub ipaddr: String,
     pub hostname: Option<String>,
@@ -9,6 +10,7 @@ pub struct IscStaticMap {
 
 #[derive(Debug, Clone)]
 pub struct IscStaticMapV6 {
+    pub iface: String,
     pub duid: String,
     pub ipaddr: String,
     pub hostname: Option<String>,
@@ -51,12 +53,14 @@ pub struct IscRangeV6 {
 pub struct Subnet {
     pub uuid: String,
     pub cidr: String,
+    pub iface: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct SubnetV6 {
     pub uuid: String,
     pub cidr: String,
+    pub iface: Option<String>,
 }
 
 pub type KeaSubnet = Subnet;

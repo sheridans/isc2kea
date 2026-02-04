@@ -1,7 +1,10 @@
 use anyhow::{anyhow, Result};
 use xmltree::{Element, XMLNode};
 
-use crate::extract::{extract_isc_options_v4, extract_isc_options_v6};
+use crate::extract::{
+    extract_interface_cidrs, extract_interface_cidrs_v6, extract_isc_options_v4,
+    extract_isc_options_v6,
+};
 use crate::extract_dnsmasq::{
     extract_existing_dnsmasq_client_ids, extract_existing_dnsmasq_ips,
     extract_existing_dnsmasq_macs, extract_existing_dnsmasq_options,
@@ -18,6 +21,7 @@ use super::options::{
     dnsmasq_option_key_from_elem, dnsmasq_option_specs_from_isc, DnsmasqOptionSpec,
 };
 use super::subnets::{cidr_prefix_v4, cidr_prefix_v6, desired_subnets_v4, desired_subnets_v6};
+use super::utils::{validate_mapping_ifaces_v4, validate_mapping_ifaces_v6};
 
 fn range_key(iface: &str, start: &str, end: &str, prefix_len: &str, mask: &str) -> String {
     format!("{}|{}|{}|{}|{}", iface, start, end, prefix_len, mask)
@@ -66,6 +70,8 @@ pub(crate) fn scan_dnsmasq(
     } else {
         Vec::new()
     };
+    let iface_cidrs_v4 = extract_interface_cidrs(root)?;
+    let iface_cidrs_v6 = extract_interface_cidrs_v6(root)?;
 
     if (!isc_mappings.is_empty()
         || !isc_mappings_v6.is_empty()
@@ -104,6 +110,9 @@ pub(crate) fn scan_dnsmasq(
     let mut reserved_ips = existing_ips;
     let mut reserved_macs = existing_macs;
     let mut reserved_client_ids = existing_client_ids;
+
+    validate_mapping_ifaces_v4(isc_mappings, &iface_cidrs_v4)?;
+    validate_mapping_ifaces_v6(isc_mappings_v6, &iface_cidrs_v6)?;
 
     if options.verbose {
         println!(
@@ -256,6 +265,8 @@ pub(crate) fn convert_dnsmasq(
     } else {
         Vec::new()
     };
+    let iface_cidrs_v4 = extract_interface_cidrs(root)?;
+    let iface_cidrs_v6 = extract_interface_cidrs_v6(root)?;
 
     if (!isc_mappings.is_empty()
         || !isc_mappings_v6.is_empty()
@@ -299,6 +310,9 @@ pub(crate) fn convert_dnsmasq(
     let mut reserved_ips = existing_ips;
     let mut reserved_macs = existing_macs;
     let mut reserved_client_ids = existing_client_ids;
+
+    validate_mapping_ifaces_v4(isc_mappings, &iface_cidrs_v4)?;
+    validate_mapping_ifaces_v6(isc_mappings_v6, &iface_cidrs_v6)?;
 
     if options.verbose {
         println!(

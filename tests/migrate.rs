@@ -146,6 +146,12 @@ fn dnsmasq_options_create_subnets() -> MigrationOptions {
 
 const TEST_XML: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -170,6 +176,12 @@ const TEST_XML: &str = r#"<?xml version="1.0"?>
 
 const TEST_XML_V6: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <opt2>
+            <ipaddrv6>2001:db8:42::1</ipaddrv6>
+            <subnetv6>64</subnetv6>
+        </opt2>
+    </interfaces>
     <dhcpdv6>
         <opt2>
             <staticmap>
@@ -195,6 +207,12 @@ const TEST_XML_V6: &str = r#"<?xml version="1.0"?>
 
 const TEST_DNSMASQ_XML: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -212,6 +230,12 @@ const TEST_DNSMASQ_XML: &str = r#"<?xml version="1.0"?>
 
 const TEST_DNSMASQ_XML_WITH_EXISTING_IP: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -233,6 +257,12 @@ const TEST_DNSMASQ_XML_WITH_EXISTING_IP: &str = r#"<?xml version="1.0"?>
 
 const TEST_DNSMASQ_XML_WITH_EXISTING_MAC: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -254,6 +284,12 @@ const TEST_DNSMASQ_XML_WITH_EXISTING_MAC: &str = r#"<?xml version="1.0"?>
 
 const TEST_DNSMASQ_XML_V6: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddrv6>fd00:1234:5678:1::1</ipaddrv6>
+            <subnetv6>64</subnetv6>
+        </lan>
+    </interfaces>
     <dhcpdv6>
         <lan>
             <staticmap>
@@ -272,6 +308,12 @@ const TEST_DNSMASQ_XML_V6: &str = r#"<?xml version="1.0"?>
 
 const TEST_DNSMASQ_XML_V6_WITH_EXISTING_IP: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddrv6>fd00:1234:5678:1::1</ipaddrv6>
+            <subnetv6>64</subnetv6>
+        </lan>
+    </interfaces>
     <dhcpdv6>
         <lan>
             <staticmap>
@@ -294,6 +336,12 @@ const TEST_DNSMASQ_XML_V6_WITH_EXISTING_IP: &str = r#"<?xml version="1.0"?>
 
 const TEST_DNSMASQ_XML_V6_WITH_EXISTING_DUID: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddrv6>fd00:1234:5678:1::1</ipaddrv6>
+            <subnetv6>64</subnetv6>
+        </lan>
+    </interfaces>
     <dhcpdv6>
         <lan>
             <staticmap>
@@ -316,6 +364,12 @@ const TEST_DNSMASQ_XML_V6_WITH_EXISTING_DUID: &str = r#"<?xml version="1.0"?>
 
 const TEST_DNSMASQ_XML_V6_WITH_EXISTING_CLIENT_ID_ONLY: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddrv6>fd00:1234:5678:1::1</ipaddrv6>
+            <subnetv6>64</subnetv6>
+        </lan>
+    </interfaces>
     <dhcpdv6>
         <lan>
             <staticmap>
@@ -335,6 +389,12 @@ const TEST_DNSMASQ_XML_V6_WITH_EXISTING_CLIENT_ID_ONLY: &str = r#"<?xml version=
 "#;
 const TEST_XML_V6_WITH_EXISTING_DUID: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <opt2>
+            <ipaddrv6>2001:db8:42::1</ipaddrv6>
+            <subnetv6>64</subnetv6>
+        </opt2>
+    </interfaces>
     <dhcpdv6>
         <opt2>
             <staticmap>
@@ -464,6 +524,12 @@ const TEST_CREATE_SUBNETS_DNSMASQ_V6: &str = r#"<?xml version="1.0"?>
 
 const TEST_CREATE_OPTIONS_DNSMASQ: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <opt1>
             <dnsserver>8.8.8.8</dnsserver>
@@ -487,6 +553,12 @@ const TEST_CREATE_OPTIONS_DNSMASQ: &str = r#"<?xml version="1.0"?>
 
 const TEST_CREATE_OPTIONS_DNSMASQ_EXISTING: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <opt1>
             <dnsserver>8.8.8.8</dnsserver>
@@ -611,6 +683,12 @@ const TEST_CREATE_SUBNETS_RANGE_OUTSIDE_CIDR: &str = r#"<?xml version="1.0"?>
 
 const TEST_CREATE_SUBNETS_MISSING_INTERFACE: &str = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <opt1>
             <range>
@@ -1014,6 +1092,12 @@ fn test_convert_creates_v6_reservation() {
 fn test_skip_duplicate_ip() {
     let xml_with_existing = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -1070,6 +1154,12 @@ fn test_skip_duplicate_v6_duid() {
 fn test_error_on_no_matching_subnet() {
     let xml_no_subnet = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>172.16.0.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -1106,9 +1196,105 @@ fn test_error_on_no_matching_subnet() {
 }
 
 #[test]
+fn test_error_on_interface_mismatch() {
+    let xml_iface_mismatch = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>10.0.0.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+        <opt1>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <lan>
+            <staticmap>
+                <mac>00:11:22:33:44:55</mac>
+                <ipaddr>192.168.1.10</ipaddr>
+                <hostname>testhost</hostname>
+            </staticmap>
+        </lan>
+    </dhcpd>
+    <Kea>
+        <dhcp4>
+            <subnets>
+                <subnet4 uuid="test-subnet-uuid-1234">
+                    <subnet>192.168.1.0/24</subnet>
+                </subnet4>
+            </subnets>
+        </dhcp4>
+    </Kea>
+</opnsense>
+"#;
+
+    let input = Cursor::new(xml_iface_mismatch);
+    let options = MigrationOptions::default();
+    let result = scan_config(input, &options);
+
+    assert!(
+        result.is_err(),
+        "Should fail when ISC interface mismatches IP"
+    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("maps to interface"));
+}
+
+#[test]
+fn test_dnsmasq_error_on_interface_mismatch() {
+    let xml_iface_mismatch = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>10.0.0.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+        <opt1>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <lan>
+            <staticmap>
+                <mac>00:11:22:33:44:55</mac>
+                <ipaddr>192.168.1.10</ipaddr>
+                <hostname>testhost</hostname>
+            </staticmap>
+        </lan>
+    </dhcpd>
+    <dnsmasq></dnsmasq>
+</opnsense>
+"#;
+
+    let input = Cursor::new(xml_iface_mismatch);
+    let options = dnsmasq_options();
+    let result = scan_config(input, &options);
+
+    assert!(
+        result.is_err(),
+        "Should fail when ISC interface mismatches IP"
+    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("maps to interface"));
+}
+
+#[test]
 fn test_error_when_kea_not_configured() {
     let xml_no_kea = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -1138,6 +1324,12 @@ fn test_error_when_kea_not_configured() {
 fn test_error_when_kea_has_no_subnets() {
     let xml_kea_no_subnets = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -1173,6 +1365,12 @@ fn test_error_when_kea_has_no_subnets() {
 fn test_handles_isc_duplicates() {
     let xml_with_isc_duplicates = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -1215,6 +1413,12 @@ fn test_handles_isc_duplicates() {
 fn test_case_insensitive_kea_tags() {
     let xml_lowercase_kea = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -1254,6 +1458,12 @@ fn test_case_insensitive_kea_tags() {
 fn test_case_insensitive_isc_tags() {
     let xml_uppercase_dhcpd = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <DHCPD>
         <lan>
             <STATICMAP>
@@ -1293,6 +1503,12 @@ fn test_case_insensitive_isc_tags() {
 fn test_fallback_kea_schema() {
     let xml_subnet4_direct = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>
@@ -1563,6 +1779,12 @@ fn test_dnsmasq_skip_duplicate_v6_duid() {
 fn test_dnsmasq_error_when_not_configured() {
     let xml_no_dnsmasq = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>

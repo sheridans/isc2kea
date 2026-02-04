@@ -1,5 +1,11 @@
 <?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <opt2>
+      <ipaddrv6>2001:db8:42::1</ipaddrv6>
+      <subnetv6>64</subnetv6>
+    </opt2>
+  </interfaces>
   <dhcpdv6>
     <opt2>
       <staticmap>

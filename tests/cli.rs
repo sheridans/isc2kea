@@ -25,6 +25,12 @@ fn test_cli_convert_rejects_same_input_output() {
         "same_io",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan></lan>
   </dhcpd>
@@ -52,6 +58,12 @@ fn test_cli_convert_requires_force_for_existing_output() {
         "existing_out_in",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan></lan>
   </dhcpd>
@@ -106,6 +118,12 @@ fn test_cli_scan_success() {
         "scan_ok",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan>
       <staticmap>

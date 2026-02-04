@@ -29,6 +29,12 @@ fn run_with_args_rejects_same_input_output() {
         "same_io",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan></lan>
   </dhcpd>
@@ -57,6 +63,12 @@ fn run_with_args_requires_force_for_existing_output() {
         "existing_out_in",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan></lan>
   </dhcpd>
@@ -103,6 +115,12 @@ fn run_with_args_convert_writes_output() {
         "convert_ok_in",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan>
       <staticmap>
@@ -146,6 +164,12 @@ fn run_with_args_convert_force_overwrites_output() {
         "convert_force_in",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan>
       <staticmap>
@@ -190,6 +214,12 @@ fn run_with_args_scan_backend_not_configured() {
         "scan_backend_missing",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan>
       <staticmap>
@@ -254,6 +284,12 @@ fn run_with_args_convert_dnsmasq_writes_output() {
         "convert_dnsmasq_in",
         r#"<?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
   <dhcpd>
     <lan>
       <staticmap>

@@ -1,5 +1,15 @@
 <?xml version="1.0"?>
 <opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>10.0.0.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+    <opt2>
+      <ipaddrv6>2001:db8:1::1</ipaddrv6>
+      <subnetv6>64</subnetv6>
+    </opt2>
+  </interfaces>
   <dhcpd>
     <lan>
       <staticmap>

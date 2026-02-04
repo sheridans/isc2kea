@@ -44,9 +44,14 @@ pub fn extract_kea_subnets(root: &Element) -> Result<Vec<Subnet>> {
                             if let Some(uuid) = subnet4.attributes.get("uuid") {
                                 if let Some(subnet_elem) = get_child_ci(subnet4, "subnet") {
                                     if let Some(cidr) = subnet_elem.get_text() {
+                                        let iface = get_child_ci(subnet4, "interface")
+                                            .and_then(|e| e.get_text())
+                                            .map(|s| s.to_string())
+                                            .filter(|s| !s.is_empty());
                                         subnets.push(Subnet {
                                             uuid: uuid.to_string(),
                                             cidr: cidr.to_string(),
+                                            iface,
                                         });
                                     }
                                 }
@@ -75,9 +80,14 @@ pub fn extract_kea_subnets_v6(root: &Element) -> Result<Vec<SubnetV6>> {
                             if let Some(uuid) = subnet6.attributes.get("uuid") {
                                 if let Some(subnet_elem) = get_child_ci(subnet6, "subnet") {
                                     if let Some(cidr) = subnet_elem.get_text() {
+                                        let iface = get_child_ci(subnet6, "interface")
+                                            .and_then(|e| e.get_text())
+                                            .map(|s| s.to_string())
+                                            .filter(|s| !s.is_empty());
                                         subnets.push(SubnetV6 {
                                             uuid: uuid.to_string(),
                                             cidr: cidr.to_string(),
+                                            iface,
                                         });
                                     }
                                 }

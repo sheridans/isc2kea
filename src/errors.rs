@@ -11,6 +11,18 @@ pub enum MigrationError {
     #[error("Invalid CIDR notation: {0}")]
     InvalidCidr(String),
 
+    #[error("IP address {0} does not match any configured interface subnet")]
+    NoMatchingInterface(String),
+
+    #[error(
+        "IP address {ip} maps to interface {derived_iface} but ISC mapping is under interface {isc_iface}"
+    )]
+    InterfaceMismatch {
+        ip: String,
+        isc_iface: String,
+        derived_iface: String,
+    },
+
     #[error("{backend} DHCPv4 not configured in config.xml. Please configure {backend} first.")]
     BackendNotConfigured { backend: String },
 

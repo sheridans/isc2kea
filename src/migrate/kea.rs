@@ -3,8 +3,9 @@ use xmltree::{Element, XMLNode};
 
 use crate::extract::{
     extract_existing_reservation_duids_v6, extract_existing_reservation_ips,
-    extract_existing_reservation_ips_v6, extract_isc_options_v4, extract_isc_options_v6,
-    extract_kea_subnets, extract_kea_subnets_v6, has_kea_dhcp4, has_kea_dhcp6,
+    extract_existing_reservation_ips_v6, extract_interface_cidrs, extract_interface_cidrs_v6,
+    extract_isc_options_v4, extract_isc_options_v6, extract_kea_subnets, extract_kea_subnets_v6,
+    has_kea_dhcp4, has_kea_dhcp6,
 };
 use crate::migrate_v4::{create_reservation_element, get_reservations_node};
 use crate::migrate_v6::{create_reservation_element_v6, get_reservations_node_v6};
@@ -13,7 +14,7 @@ use crate::{IscStaticMap, IscStaticMapV6, MigrationError, MigrationOptions, Migr
 
 use super::options::apply_kea_options;
 use super::subnets::{apply_kea_subnets, desired_subnets_v4, desired_subnets_v6};
-use super::utils::short_uuid;
+use super::utils::{short_uuid, validate_mapping_ifaces_v4, validate_mapping_ifaces_v6};
 
 /// Scan an input configuration for Kea migration stats.
 pub(crate) fn scan_kea(
@@ -27,6 +28,8 @@ pub(crate) fn scan_kea(
     let kea_subnets_v6 = extract_kea_subnets_v6(root)?;
     let existing_ips_v6 = extract_existing_reservation_ips_v6(root)?;
     let existing_duids_v6 = extract_existing_reservation_duids_v6(root)?;
+    let iface_cidrs_v4 = extract_interface_cidrs(root)?;
+    let iface_cidrs_v6 = extract_interface_cidrs_v6(root)?;
     let desired_v4 = if options.create_subnets {
         desired_subnets_v4(root)?
     } else {
@@ -121,6 +124,9 @@ pub(crate) fn scan_kea(
         }
     }
 
+    validate_mapping_ifaces_v4(isc_mappings, &iface_cidrs_v4)?;
+    validate_mapping_ifaces_v6(isc_mappings_v6, &iface_cidrs_v6)?;
+
     // Check fail_if_existing flag
     if options.fail_if_existing
         && (!existing_ips.is_empty()
@@ -150,6 +156,7 @@ pub(crate) fn scan_kea(
                 effective_subnets.push(crate::Subnet {
                     uuid: format!("new-{}", uuid::Uuid::new_v4()),
                     cidr: subnet.cidr.clone(),
+                    iface: Some(subnet.iface.clone()),
                 });
             }
         }
@@ -162,6 +169,7 @@ pub(crate) fn scan_kea(
                 effective_subnets_v6.push(crate::SubnetV6 {
                     uuid: format!("new-{}", uuid::Uuid::new_v4()),
                     cidr: subnet.cidr.clone(),
+                    iface: Some(subnet.iface.clone()),
                 });
             }
         }
@@ -259,6 +267,8 @@ pub(crate) fn convert_kea(
     let mut kea_subnets_v6 = extract_kea_subnets_v6(root)?;
     let existing_ips_v6 = extract_existing_reservation_ips_v6(root)?;
     let existing_duids_v6 = extract_existing_reservation_duids_v6(root)?;
+    let iface_cidrs_v4 = extract_interface_cidrs(root)?;
+    let iface_cidrs_v6 = extract_interface_cidrs_v6(root)?;
     let desired_v4 = if options.create_subnets {
         desired_subnets_v4(root)?
     } else {
@@ -293,6 +303,9 @@ pub(crate) fn convert_kea(
     if options.create_options {
         apply_kea_options(root, &options_v4, &options_v6, options.force_options)?;
     }
+
+    validate_mapping_ifaces_v4(isc_mappings, &iface_cidrs_v4)?;
+    validate_mapping_ifaces_v6(isc_mappings_v6, &iface_cidrs_v6)?;
 
     // Early check: differentiate between "Kea not configured" vs "no subnets"
     if !isc_mappings.is_empty() && kea_subnets.is_empty() && !options.create_subnets {

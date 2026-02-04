@@ -91,6 +91,12 @@ mod tests {
     fn test_fail_if_existing_flag() {
         let xml_with_existing = r#"<?xml version="1.0"?>
 <opnsense>
+    <interfaces>
+        <lan>
+            <ipaddr>192.168.1.1</ipaddr>
+            <subnet>24</subnet>
+        </lan>
+    </interfaces>
     <dhcpd>
         <lan>
             <staticmap>

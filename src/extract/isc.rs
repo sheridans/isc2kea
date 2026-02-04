@@ -15,6 +15,7 @@ pub fn extract_isc_mappings(root: &Element) -> Result<Vec<IscStaticMap>> {
         // Iterate over all interface nodes (lan, wan, opt1, etc.)
         for iface_node in dhcpd.children.iter() {
             if let Some(iface_elem) = iface_node.as_element() {
+                let iface_name = iface_elem.name.clone();
                 // Look for staticmap children (case-insensitive)
                 for child in iface_elem.children.iter() {
                     if let Some(staticmap) = child.as_element() {
@@ -47,6 +48,7 @@ pub fn extract_isc_mappings(root: &Element) -> Result<Vec<IscStaticMap>> {
                                 .map(|s| s.to_string());
 
                             mappings.push(IscStaticMap {
+                                iface: iface_name.clone(),
                                 mac,
                                 ipaddr,
                                 hostname,
@@ -72,6 +74,7 @@ pub fn extract_isc_mappings_v6(root: &Element) -> Result<Vec<IscStaticMapV6>> {
         // Iterate over all interface nodes (lan, wan, opt1, etc.)
         for iface_node in dhcpdv6.children.iter() {
             if let Some(iface_elem) = iface_node.as_element() {
+                let iface_name = iface_elem.name.clone();
                 // Look for staticmap children (case-insensitive)
                 for child in iface_elem.children.iter() {
                     if let Some(staticmap) = child.as_element() {
@@ -104,6 +107,7 @@ pub fn extract_isc_mappings_v6(root: &Element) -> Result<Vec<IscStaticMapV6>> {
                                 .map(|s| s.to_string());
 
                             mappings.push(IscStaticMapV6 {
+                                iface: iface_name.clone(),
                                 duid,
                                 ipaddr,
                                 hostname,
