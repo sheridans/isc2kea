@@ -7,8 +7,10 @@ use xmltree::Element;
 fn test_create_subnets_kea_v4() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_KEA_V4);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 
@@ -43,8 +45,10 @@ fn test_create_subnets_kea_v4() {
 fn test_create_subnets_kea_v6() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_KEA_V6);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 
@@ -169,8 +173,10 @@ fn test_create_subnets_dnsmasq_v6() {
 fn test_create_subnets_kea_existing_skip() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_KEA_V4_EXISTING);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 
@@ -199,9 +205,11 @@ fn test_create_subnets_kea_existing_skip() {
 fn test_create_subnets_kea_existing_force() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_KEA_V4_EXISTING);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
-    options.force_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        force_subnets: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 
@@ -287,8 +295,10 @@ fn test_create_subnets_dnsmasq_existing_force() {
 fn test_create_subnets_range_outside_cidr_errors() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_RANGE_OUTSIDE_CIDR);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     let err = convert_config(input, &mut output, &options)
         .expect_err("convert should fail for out-of-subnet range");
@@ -301,8 +311,10 @@ fn test_create_subnets_range_outside_cidr_errors() {
 fn test_create_subnets_missing_interface_errors() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_MISSING_INTERFACE);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     let err = convert_config(input, &mut output, &options)
         .expect_err("convert should fail when interface CIDR is missing");
@@ -315,8 +327,10 @@ fn test_create_subnets_missing_interface_errors() {
 fn test_create_subnets_dhcp_interface_errors() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_DHCP_INTERFACE);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     let err = convert_config(input, &mut output, &options)
         .expect_err("convert should fail for DHCP interface");
@@ -329,8 +343,10 @@ fn test_create_subnets_dhcp_interface_errors() {
 fn test_create_subnets_track6_interface_errors() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_TRACK6_INTERFACE);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     let err = convert_config(input, &mut output, &options)
         .expect_err("convert should fail for track6 interface");
@@ -342,8 +358,10 @@ fn test_create_subnets_track6_interface_errors() {
 #[test]
 fn test_scan_create_subnets_kea_no_mutation() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_KEA_V4);
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     let stats = scan_config(input, &options).expect("scan should succeed");
     assert_eq!(stats.target_subnets_found, 0);
@@ -364,8 +382,10 @@ fn test_scan_create_subnets_dnsmasq_no_mutation() {
 fn test_create_subnets_multiple_ranges_v4() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_MULTI_RANGE_V4);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 
@@ -400,8 +420,10 @@ fn test_create_subnets_multiple_ranges_v4() {
 fn test_create_subnets_multiple_ranges_v6() {
     let input = Cursor::new(TEST_CREATE_SUBNETS_MULTI_RANGE_V6);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_subnets = true;
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 

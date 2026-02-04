@@ -7,8 +7,10 @@ use xmltree::Element;
 fn test_create_options_kea_v4() {
     let input = Cursor::new(TEST_CREATE_OPTIONS_KEA_V4);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_options = true;
+    let options = MigrationOptions {
+        create_options: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 
@@ -66,8 +68,10 @@ fn test_create_options_kea_v4() {
 fn test_create_options_kea_v6() {
     let input = Cursor::new(TEST_CREATE_OPTIONS_KEA_V6);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_options = true;
+    let options = MigrationOptions {
+        create_options: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 
@@ -101,8 +105,10 @@ fn test_create_options_kea_v6() {
 fn test_create_options_kea_existing_skip_and_force() {
     let input = Cursor::new(TEST_CREATE_OPTIONS_KEA_V4_EXISTING);
     let mut output = Vec::new();
-    let mut options = MigrationOptions::default();
-    options.create_options = true;
+    let options = MigrationOptions {
+        create_options: true,
+        ..Default::default()
+    };
 
     convert_config(input, &mut output, &options).expect("convert should succeed");
 
@@ -125,9 +131,11 @@ fn test_create_options_kea_existing_skip_and_force() {
     assert_eq!(dns, "9.9.9.9");
 
     let mut output_force = Vec::new();
-    let mut options_force = MigrationOptions::default();
-    options_force.create_options = true;
-    options_force.force_options = true;
+    let options_force = MigrationOptions {
+        create_options: true,
+        force_options: true,
+        ..Default::default()
+    };
 
     convert_config(
         Cursor::new(TEST_CREATE_OPTIONS_KEA_V4_EXISTING),
