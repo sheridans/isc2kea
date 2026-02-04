@@ -12,21 +12,35 @@ A safe, production-ready CLI tool to migrate ISC DHCP static mappings to Kea DHC
 
 ### Migrate to Kea (default)
 
-1. Create Kea DHCPv4/DHCPv6 subnets in OPNsense first.
+1. Create Kea DHCPv4/DHCPv6 subnets in OPNsense first (or use `--create-subnets`).
 2. Take a backup or snapshot
 3. Download the config.xml from OPNsense
 4. `isc2kea scan --in ./your-config.xml`
 5. `isc2kea convert --in ./your-config.xml --out /conf/config.xml.new`
 6. Upload the config.xml back to OPNsense
 
+Optional (create subnets/ranges from ISC if they are not already defined):
+
+```bash
+isc2kea scan --in ./your-config.xml --create-subnets
+isc2kea convert --in ./your-config.xml --out /conf/config.xml.new --create-subnets
+```
+
 ### Migrate to dnsmasq
 
-1. Enable dnsmasq in OPNsense first.
+1. Ensure dnsmasq is configured in `config.xml` (it does not need to be enabled yet).
 2. Take a backup or snapshot
 3. Download the config.xml from OPNsense
 4. `isc2kea scan --in ./your-config.xml --backend dnsmasq`
 5. `isc2kea convert --in ./your-config.xml --out /conf/config.xml.new --backend dnsmasq`
 6. Upload the config.xml back to OPNsense
+
+Optional (create subnets/ranges from ISC if they are not already defined):
+
+```bash
+isc2kea scan --in ./your-config.xml --backend dnsmasq --create-subnets
+isc2kea convert --in ./your-config.xml --out /conf/config.xml.new --backend dnsmasq --create-subnets
+```
 
 ## Why This Exists
 
@@ -39,7 +53,7 @@ This tool is designed to be safe on production firewalls:
 - **Read-only by default** - No files are modified unless you explicitly use `convert --out`
 - **No in-place edits** - Always writes to a separate output file
 - **Fails loudly** - Aborts on ambiguity or invalid data (never auto-creates backend sections)
-- **No subnet creation** - Kea subnets must already exist; this tool will not create them
+- **No subnet creation by default** - Kea subnets must already exist unless you use `--create-subnets`
 - **No guessing** - Requires exact subnet matches for all IP addresses (Kea backend)
 - **Duplicate detection** - Handles messy ISC configs with duplicate IPs and MACs
 - **Case-insensitive** - Works with any tag casing: `<Kea>`/`<kea>`, `<DHCPD>`/`<dhcpd>`, etc.
@@ -62,6 +76,23 @@ The output XML will be reformatted (whitespace and indentation may change). This
 **Defaults**:
 - `--in` defaults to `/conf/config.xml`
 - `--backend` defaults to `kea`
+
+### Optional Subnet/Range Creation (Safe, Opt-In)
+
+By default, the tool **does not create subnets/ranges**. If you want it to create them from ISC ranges:
+
+```bash
+isc2kea scan --in /conf/config.xml --create-subnets
+isc2kea convert --in /conf/config.xml --out /tmp/config.xml --create-subnets
+```
+
+Behavior:
+- **Add-only**: existing subnets/ranges are **left untouched** and a warning is printed.
+- **Force overwrite** (dangerous): use `--force-subnets` to replace matching subnets/ranges.
+
+Notes:
+- Subnets are derived from interface IP + prefix (`<interfaces>`), and pools/ranges come from ISC `<range>` entries.
+- **Prefix Delegation (`prefixrange`) is not yet supported** and is ignored.
 
 ### Backend Selection
 
@@ -141,7 +172,7 @@ isc2kea convert --out /tmp/config_migrated.xml --force
 3. Review the diff between the original and `.new` file
 4. Replace the config manually (outside the tool scope)
 
-Before running, create the required Kea DHCPv4/DHCPv6 subnets (or enable dnsmasq) in OPNsense. The tool only adds reservations/hosts and will error if the target backend is not configured.
+Before running, create the required Kea DHCPv4/DHCPv6 subnets (or enable dnsmasq) in OPNsense, or use `--create-subnets`. The tool only adds reservations/hosts and will error if the target backend is not configured.
 
 ### Abort on Existing Reservations
 

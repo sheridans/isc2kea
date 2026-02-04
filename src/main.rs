@@ -33,6 +33,14 @@ enum Commands {
         #[arg(long)]
         fail_if_existing: bool,
 
+        /// Create missing subnets/ranges in the target backend
+        #[arg(long)]
+        create_subnets: bool,
+
+        /// Overwrite existing subnets/ranges when creating them
+        #[arg(long, requires = "create_subnets")]
+        force_subnets: bool,
+
         /// Show detailed progress for each mapping
         #[arg(short, long)]
         verbose: bool,
@@ -55,6 +63,14 @@ enum Commands {
         /// Abort if any existing reservations/hosts are found
         #[arg(long)]
         fail_if_existing: bool,
+
+        /// Create missing subnets/ranges in the target backend
+        #[arg(long)]
+        create_subnets: bool,
+
+        /// Overwrite existing subnets/ranges when creating them
+        #[arg(long, requires = "create_subnets")]
+        force_subnets: bool,
 
         /// Show detailed progress for each mapping
         #[arg(short, long)]
@@ -81,6 +97,8 @@ fn run() -> Result<()> {
             r#in,
             backend,
             fail_if_existing,
+            create_subnets,
+            force_subnets,
             verbose,
         } => {
             let mut file = File::open(&r#in)
@@ -93,6 +111,8 @@ fn run() -> Result<()> {
                 fail_if_existing,
                 verbose,
                 backend: backend.clone(),
+                create_subnets,
+                force_subnets,
             };
 
             let stats = match isc2kea::scan_config(Cursor::new(&buffer), &options) {
@@ -106,7 +126,8 @@ fn run() -> Result<()> {
                                 | isc2kea::MigrationError::BackendV6NotConfigured { .. }
                                 | isc2kea::MigrationError::NoBackendSubnetsV6 { .. }
                         ) {
-                            if let Ok(stats) = isc2kea::scan_counts(Cursor::new(&buffer)) {
+                            if let Ok(stats) = isc2kea::scan_counts(Cursor::new(&buffer), &backend)
+                            {
                                 print_scan_stats(&stats, &backend);
                             }
                         }
@@ -124,6 +145,8 @@ fn run() -> Result<()> {
             backend,
             out,
             fail_if_existing,
+            create_subnets,
+            force_subnets,
             verbose,
             force,
         } => {
@@ -198,6 +221,8 @@ fn run() -> Result<()> {
                 fail_if_existing,
                 verbose,
                 backend: backend.clone(),
+                create_subnets,
+                force_subnets,
             };
 
             let stats = isc2kea::convert_config(input_file, output_file, &options)?;

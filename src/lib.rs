@@ -18,8 +18,10 @@ pub use extract::{
     extract_kea_subnets, extract_kea_subnets_v6,
 };
 pub use migrate::{convert_config, scan_config, scan_counts};
-pub use subnet::{find_subnet_for_ip, find_subnet_for_ip_v6, ip_in_subnet, ip_in_subnet_v6};
+pub use subnet::{
+    find_subnet_for_ip, find_subnet_for_ip_v6, ip_in_subnet, ip_in_subnet_v6, prefix_to_netmask,
+};
 pub use types::{
-    IscStaticMap, IscStaticMapV6, KeaSubnet, KeaSubnetV6, MigrationOptions, MigrationStats, Subnet,
-    SubnetV6,
+    IscRangeV4, IscRangeV6, IscStaticMap, IscStaticMapV6, KeaSubnet, KeaSubnetV6, MigrationOptions,
+    MigrationStats, Subnet, SubnetV6,
 };

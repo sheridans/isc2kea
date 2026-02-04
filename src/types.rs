@@ -17,6 +17,20 @@ pub struct IscStaticMapV6 {
 }
 
 #[derive(Debug, Clone)]
+pub struct IscRangeV4 {
+    pub iface: String,
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct IscRangeV6 {
+    pub iface: String,
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Subnet {
     pub uuid: String,
     pub cidr: String,
@@ -50,4 +64,6 @@ pub struct MigrationOptions {
     pub fail_if_existing: bool,
     pub verbose: bool,
     pub backend: Backend,
+    pub create_subnets: bool,
+    pub force_subnets: bool,
 }

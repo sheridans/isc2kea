@@ -50,6 +50,13 @@ pub fn ip_in_subnet_v6(ip: &str, cidr: &str) -> Result<bool> {
     Ok(network.contains(&ip_addr))
 }
 
+/// Convert an IPv4 prefix length to a subnet mask string (e.g. 24 -> 255.255.255.0)
+pub fn prefix_to_netmask(prefix: u8) -> Result<String> {
+    let net = Ipv4Net::new(Ipv4Addr::UNSPECIFIED, prefix)
+        .map_err(|_| MigrationError::InvalidCidr(prefix.to_string()))?;
+    Ok(net.netmask().to_string())
+}
+
 /// Find the matching IPv6 subnet UUID for an IP address
 pub fn find_subnet_for_ip_v6(ip: &str, subnets: &[SubnetV6]) -> Result<String> {
     let ip_addr =

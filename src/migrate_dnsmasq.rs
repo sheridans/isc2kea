@@ -164,3 +164,88 @@ pub fn get_dnsmasq_node(root: &mut Element) -> Result<&mut Element> {
 
     find_mut_descendant_ci(root, "dnsmasq").ok_or_else(|| anyhow!("Failed to access dnsmasq node"))
 }
+
+/// Create a dnsmasq DHCP range element for IPv4.
+pub fn create_dnsmasq_range_element_v4(
+    iface: &str,
+    start: &str,
+    end: &str,
+    subnet_mask: &str,
+) -> Element {
+    let mut range = Element::new("dhcp_ranges");
+    range
+        .attributes
+        .insert("uuid".to_string(), uuid::Uuid::new_v4().to_string());
+
+    let mut interface = Element::new("interface");
+    interface.children.push(XMLNode::Text(iface.to_string()));
+    range.children.push(XMLNode::Element(interface));
+
+    for (tag, value) in [
+        ("set_tag", ""),
+        ("start_addr", start),
+        ("end_addr", end),
+        ("subnet_mask", subnet_mask),
+        ("constructor", ""),
+        ("mode", ""),
+        ("lease_time", ""),
+        ("domain_type", "range"),
+        ("domain", ""),
+        ("nosync", "0"),
+        ("ra_mode", ""),
+        ("ra_priority", ""),
+        ("ra_mtu", ""),
+        ("ra_interval", ""),
+        ("ra_router_lifetime", ""),
+        ("description", ""),
+    ] {
+        let mut elem = Element::new(tag);
+        elem.children.push(XMLNode::Text(value.to_string()));
+        range.children.push(XMLNode::Element(elem));
+    }
+
+    range
+}
+
+/// Create a dnsmasq DHCP range element for IPv6.
+pub fn create_dnsmasq_range_element_v6(
+    iface: &str,
+    start: &str,
+    end: &str,
+    prefix_len: &str,
+) -> Element {
+    let mut range = Element::new("dhcp_ranges");
+    range
+        .attributes
+        .insert("uuid".to_string(), uuid::Uuid::new_v4().to_string());
+
+    let mut interface = Element::new("interface");
+    interface.children.push(XMLNode::Text(iface.to_string()));
+    range.children.push(XMLNode::Element(interface));
+
+    for (tag, value) in [
+        ("set_tag", ""),
+        ("start_addr", start),
+        ("end_addr", end),
+        ("subnet_mask", ""),
+        ("constructor", ""),
+        ("mode", ""),
+        ("prefix_len", prefix_len),
+        ("lease_time", ""),
+        ("domain_type", "range"),
+        ("domain", ""),
+        ("nosync", "0"),
+        ("ra_mode", ""),
+        ("ra_priority", ""),
+        ("ra_mtu", ""),
+        ("ra_interval", ""),
+        ("ra_router_lifetime", ""),
+        ("description", ""),
+    ] {
+        let mut elem = Element::new(tag);
+        elem.children.push(XMLNode::Text(value.to_string()));
+        range.children.push(XMLNode::Element(elem));
+    }
+
+    range
+}
