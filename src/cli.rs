@@ -54,6 +54,10 @@ enum Commands {
         #[arg(long, requires = "create_options")]
         force_options: bool,
 
+        /// Enable target backend and disable ISC DHCP on migrated interfaces
+        #[arg(long)]
+        enable_backend: bool,
+
         /// Show detailed progress for each mapping
         #[arg(short, long)]
         verbose: bool,
@@ -93,6 +97,10 @@ enum Commands {
         #[arg(long, requires = "create_options")]
         force_options: bool,
 
+        /// Enable target backend and disable ISC DHCP on migrated interfaces
+        #[arg(long)]
+        enable_backend: bool,
+
         /// Show detailed progress for each mapping
         #[arg(short, long)]
         verbose: bool,
@@ -119,6 +127,7 @@ where
             force_subnets,
             create_options,
             force_options,
+            enable_backend,
             verbose,
         } => {
             let mut file = File::open(&r#in)
@@ -135,6 +144,7 @@ where
                 force_subnets,
                 create_options,
                 force_options,
+                enable_backend,
             };
 
             let stats = match scan_config(Cursor::new(&buffer), &options) {
@@ -170,6 +180,7 @@ where
             force_subnets,
             create_options,
             force_options,
+            enable_backend,
             verbose,
             force,
         } => {
@@ -248,6 +259,7 @@ where
                 force_subnets,
                 create_options,
                 force_options,
+                enable_backend,
             };
 
             let stats = convert_config(input_file, output_file, &options)?;

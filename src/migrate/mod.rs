@@ -11,6 +11,7 @@ use crate::{MigrationOptions, MigrationStats};
 mod dnsmasq;
 mod kea;
 mod options;
+mod services;
 mod subnets;
 mod utils;
 

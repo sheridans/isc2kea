@@ -20,6 +20,7 @@ use crate::{IscStaticMap, IscStaticMapV6, MigrationError, MigrationOptions, Migr
 use super::options::{
     dnsmasq_option_key_from_elem, dnsmasq_option_specs_from_isc, DnsmasqOptionSpec,
 };
+use super::services::{disable_isc_dhcp, enable_dnsmasq};
 use super::subnets::{
     cidr_prefix_v4, cidr_prefix_v6, desired_subnets_v4, desired_subnets_v6, DesiredSubnetV4,
     DesiredSubnetV6,
@@ -554,6 +555,13 @@ pub(crate) fn convert_dnsmasq(
 
     if options.create_subnets {
         apply_dnsmasq_interfaces(root, &desired_v4, &desired_v6)?;
+    }
+
+    if options.enable_backend {
+        disable_isc_dhcp(root, &desired_v4, &desired_v6)?;
+        if !desired_v4.is_empty() || !desired_v6.is_empty() {
+            enable_dnsmasq(root)?;
+        }
     }
 
     Ok(MigrationStats {

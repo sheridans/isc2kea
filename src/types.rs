@@ -89,4 +89,5 @@ pub struct MigrationOptions {
     pub force_subnets: bool,
     pub create_options: bool,
     pub force_options: bool,
+    pub enable_backend: bool,
 }

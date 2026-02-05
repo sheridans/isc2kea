@@ -13,6 +13,7 @@ use crate::subnet::{find_subnet_for_ip, find_subnet_for_ip_v6};
 use crate::{IscStaticMap, IscStaticMapV6, MigrationError, MigrationOptions, MigrationStats};
 
 use super::options::apply_kea_options;
+use super::services::{disable_isc_dhcp, enable_kea};
 use super::subnets::{
     apply_kea_interfaces, apply_kea_subnets, desired_subnets_v4, desired_subnets_v6,
 };
@@ -475,6 +476,11 @@ pub(crate) fn convert_kea(
             reserved_duids_v6.insert(mapping.duid.clone());
             to_create_v6 += 1;
         }
+    }
+
+    if options.enable_backend {
+        disable_isc_dhcp(root, &desired_v4, &desired_v6)?;
+        enable_kea(root, !kea_subnets.is_empty(), !kea_subnets_v6.is_empty())?;
     }
 
     Ok(MigrationStats {

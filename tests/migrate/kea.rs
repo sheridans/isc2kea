@@ -687,4 +687,62 @@ fn test_convert_matches_golden_fixtures() {
     );
 }
 
+#[test]
+fn test_enable_backend_kea_enables_dhcp4() {
+    let input = Cursor::new(TEST_ENABLE_BACKEND_KEA);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        create_subnets: true,
+        enable_backend: true,
+        ..Default::default()
+    };
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+
+    // Check Kea dhcp4 is enabled
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp4 = kea.get_child("dhcp4").expect("Should have dhcp4 node");
+    let general = dhcp4
+        .get_child("general")
+        .expect("Should have general node");
+    let enabled = general
+        .get_child("enabled")
+        .expect("Should have enabled element");
+    let enabled_value = enabled.get_text().expect("Should have enabled value");
+    assert_eq!(enabled_value, "1", "Kea dhcp4 should be enabled");
+}
+
+#[test]
+fn test_enable_backend_kea_disables_isc() {
+    let input = Cursor::new(TEST_ENABLE_BACKEND_KEA);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        create_subnets: true,
+        enable_backend: true,
+        ..Default::default()
+    };
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+
+    // Check ISC DHCP is disabled on opt1
+    let dhcpd = root.get_child("dhcpd").expect("Should have dhcpd node");
+    let opt1 = dhcpd.get_child("opt1").expect("Should have opt1 node");
+    let enable = opt1
+        .get_child("enable")
+        .expect("Should have enable element");
+    let enable_value = enable.get_text().unwrap_or_default();
+    assert!(
+        enable_value.is_empty(),
+        "ISC DHCP should be disabled (empty enable)"
+    );
+}
+
 // ---------------------------------------------------------------------------

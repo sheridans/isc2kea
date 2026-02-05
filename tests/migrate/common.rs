@@ -963,3 +963,55 @@ pub const TEST_CREATE_SUBNETS_DNSMASQ_V4_EXISTING_INTERFACES: &str = r#"<?xml ve
     </dnsmasq>
 </opnsense>
 "#;
+
+pub const TEST_ENABLE_BACKEND_KEA: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <opt1>
+            <enable>1</enable>
+            <range>
+                <from>10.22.1.100</from>
+                <to>10.22.1.200</to>
+            </range>
+        </opt1>
+    </dhcpd>
+    <Kea>
+        <dhcp4>
+            <general>
+                <enabled>0</enabled>
+            </general>
+            <subnets></subnets>
+            <reservations></reservations>
+        </dhcp4>
+    </Kea>
+</opnsense>
+"#;
+
+pub const TEST_ENABLE_BACKEND_DNSMASQ: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <opt1>
+            <enable>1</enable>
+            <range>
+                <from>10.22.1.100</from>
+                <to>10.22.1.200</to>
+            </range>
+        </opt1>
+    </dhcpd>
+    <dnsmasq>
+        <enable>0</enable>
+    </dnsmasq>
+</opnsense>
+"#;
