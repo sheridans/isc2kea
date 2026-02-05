@@ -687,4 +687,180 @@ fn test_convert_matches_golden_fixtures() {
     );
 }
 
+#[test]
+fn test_enable_backend_kea_enables_dhcp4() {
+    let input = Cursor::new(TEST_ENABLE_BACKEND_KEA);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        create_subnets: true,
+        enable_backend: true,
+        ..Default::default()
+    };
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+
+    // Check Kea dhcp4 is enabled
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp4 = kea.get_child("dhcp4").expect("Should have dhcp4 node");
+    let general = dhcp4
+        .get_child("general")
+        .expect("Should have general node");
+    let enabled = general
+        .get_child("enabled")
+        .expect("Should have enabled element");
+    let enabled_value = enabled.get_text().expect("Should have enabled value");
+    assert_eq!(enabled_value, "1", "Kea dhcp4 should be enabled");
+}
+
+#[test]
+fn test_enable_backend_kea_disables_isc() {
+    let input = Cursor::new(TEST_ENABLE_BACKEND_KEA);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        create_subnets: true,
+        enable_backend: true,
+        ..Default::default()
+    };
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+
+    // Check ISC DHCP is disabled on opt1 (enable tag removed)
+    let dhcpd = root.get_child("dhcpd").expect("Should have dhcpd node");
+    let opt1 = dhcpd.get_child("opt1").expect("Should have opt1 node");
+    assert!(
+        opt1.get_child("enable").is_none(),
+        "ISC DHCP should be disabled (missing enable)"
+    );
+}
+
+#[test]
+fn test_enable_backend_kea_disables_isc_without_ranges() {
+    let xml_no_ranges = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <opt1>
+            <enable>1</enable>
+            <staticmap>
+                <mac>04:d9:f5:cb:9b:54</mac>
+                <ipaddr>10.22.1.50</ipaddr>
+            </staticmap>
+        </opt1>
+    </dhcpd>
+    <Kea>
+        <dhcp4>
+            <subnets>
+                <subnet4 uuid="test-subnet-uuid-1234">
+                    <subnet>10.22.1.0/24</subnet>
+                </subnet4>
+            </subnets>
+        </dhcp4>
+    </Kea>
+</opnsense>
+"#;
+
+    let input = Cursor::new(xml_no_ranges);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        enable_backend: true,
+        ..Default::default()
+    };
+
+    let stats = convert_config(input, &mut output, &options).expect("convert should succeed");
+    assert_eq!(stats.isc_disabled_v4, vec!["opt1"]);
+}
+
+#[test]
+fn test_enable_backend_kea_sets_enabled_tag() {
+    let xml_missing_enabled = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <opt1>
+            <enable>1</enable>
+            <range>
+                <from>10.22.1.100</from>
+                <to>10.22.1.200</to>
+            </range>
+            <staticmap>
+                <mac>04:d9:f5:cb:9b:54</mac>
+                <ipaddr>10.22.1.50</ipaddr>
+            </staticmap>
+        </opt1>
+    </dhcpd>
+    <Kea>
+        <dhcp4>
+            <general></general>
+            <subnets>
+                <subnet4 uuid="test-subnet-uuid-1234">
+                    <subnet>10.22.1.0/24</subnet>
+                </subnet4>
+            </subnets>
+            <reservations></reservations>
+        </dhcp4>
+    </Kea>
+</opnsense>
+"#;
+
+    let input = Cursor::new(xml_missing_enabled);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        enable_backend: true,
+        ..Default::default()
+    };
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp4 = kea.get_child("dhcp4").expect("Should have dhcp4 node");
+    let general = dhcp4
+        .get_child("general")
+        .expect("Should have general node");
+    let enabled = general
+        .get_child("enabled")
+        .expect("Should have enabled element");
+    let enabled_value = enabled.get_text().expect("Should have enabled value");
+    assert_eq!(enabled_value, "1", "Kea dhcp4 should be enabled");
+}
+
+#[test]
+fn test_enable_backend_kea_stats() {
+    let input = Cursor::new(TEST_ENABLE_BACKEND_KEA);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        create_subnets: true,
+        enable_backend: true,
+        ..Default::default()
+    };
+
+    let stats = convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    assert_eq!(stats.interfaces_configured, vec!["opt1"]);
+    assert_eq!(stats.isc_disabled_v4, vec!["opt1"]);
+    assert!(stats.isc_disabled_v6.is_empty());
+    assert!(stats.backend_enabled_v4);
+    assert!(!stats.backend_enabled_v6);
+}
+
 // ---------------------------------------------------------------------------

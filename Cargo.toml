@@ -1,6 +1,6 @@
 [package]
 name = "isc2kea"
-version = "1.1.2"
+version = "1.2.0"
 edition = "2021"
 description = "Migrate ISC DHCP static mappings to Kea or dnsmasq DHCP configurations for OPNsense"
 license = "BSD-2-Clause"
@@ -18,3 +18,4 @@ thiserror = "1.0"
 xmltree = "0.10"
 ipnet = "2.9"
 uuid = { version = "1.11", features = ["v4"] }
+similar = "2.5"

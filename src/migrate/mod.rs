@@ -4,13 +4,15 @@ use xmltree::{Element, EmitterConfig};
 
 use crate::backend::Backend;
 use crate::extract::{
-    extract_isc_mappings, extract_isc_mappings_v6, extract_kea_subnets, extract_kea_subnets_v6,
+    extract_isc_mappings, extract_isc_mappings_v6, extract_isc_ranges, extract_isc_ranges_v6,
+    extract_kea_subnets, extract_kea_subnets_v6,
 };
 use crate::{MigrationOptions, MigrationStats};
 
 mod dnsmasq;
 mod kea;
 mod options;
+pub(crate) mod services;
 mod subnets;
 mod utils;
 
@@ -20,6 +22,8 @@ pub fn scan_counts<R: Read>(reader: R, backend: &Backend) -> Result<MigrationSta
 
     let isc_mappings = extract_isc_mappings(&root)?;
     let isc_mappings_v6 = extract_isc_mappings_v6(&root)?;
+    let isc_ranges = extract_isc_ranges(&root)?;
+    let isc_ranges_v6 = extract_isc_ranges_v6(&root)?;
 
     let (target_subnets_found, target_subnets_v6_found) = match backend {
         Backend::Kea => {
@@ -33,12 +37,15 @@ pub fn scan_counts<R: Read>(reader: R, backend: &Backend) -> Result<MigrationSta
     Ok(MigrationStats {
         isc_mappings_found: isc_mappings.len(),
         isc_mappings_v6_found: isc_mappings_v6.len(),
+        isc_ranges_found: isc_ranges.len(),
+        isc_ranges_v6_found: isc_ranges_v6.len(),
         target_subnets_found,
         target_subnets_v6_found,
         reservations_to_create: 0,
         reservations_v6_to_create: 0,
         reservations_skipped: 0,
         reservations_v6_skipped: 0,
+        ..Default::default()
     })
 }
 
@@ -47,11 +54,18 @@ pub fn scan_config<R: Read>(reader: R, options: &MigrationOptions) -> Result<Mig
     let root = Element::parse(reader).context("Failed to parse XML")?;
     let isc_mappings = extract_isc_mappings(&root)?;
     let isc_mappings_v6 = extract_isc_mappings_v6(&root)?;
+    let isc_ranges = extract_isc_ranges(&root)?;
+    let isc_ranges_v6 = extract_isc_ranges_v6(&root)?;
 
-    match options.backend {
+    let mut stats = match options.backend {
         Backend::Kea => kea::scan_kea(&root, &isc_mappings, &isc_mappings_v6, options),
         Backend::Dnsmasq => dnsmasq::scan_dnsmasq(&root, &isc_mappings, &isc_mappings_v6, options),
-    }
+    }?;
+
+    stats.isc_ranges_found = isc_ranges.len();
+    stats.isc_ranges_v6_found = isc_ranges_v6.len();
+
+    Ok(stats)
 }
 
 /// Convert ISC static mappings into the target backend format, writing the

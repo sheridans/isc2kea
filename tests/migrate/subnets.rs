@@ -453,3 +453,174 @@ fn test_create_subnets_multiple_ranges_v6() {
     assert!(pool_parts.contains(&"fd00:1234:5678:1::10-fd00:1234:5678:1::20"));
     assert!(pool_parts.contains(&"fd00:1234:5678:1::100-fd00:1234:5678:1::200"));
 }
+
+#[test]
+fn test_create_subnets_kea_adds_interfaces_v4() {
+    let input = Cursor::new(TEST_CREATE_SUBNETS_KEA_V4);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp4 = kea.get_child("dhcp4").expect("Should have dhcp4 node");
+    let general = dhcp4
+        .get_child("general")
+        .expect("Should have general node");
+    let interfaces = general
+        .get_child("interfaces")
+        .expect("Should have interfaces");
+    let iface_value = interfaces.get_text().expect("Should have interface value");
+    assert_eq!(iface_value, "opt1");
+}
+
+#[test]
+fn test_create_subnets_kea_adds_interfaces_v6() {
+    let input = Cursor::new(TEST_CREATE_SUBNETS_KEA_V6);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp6 = kea.get_child("dhcp6").expect("Should have dhcp6 node");
+
+    // Check general interfaces
+    let general = dhcp6
+        .get_child("general")
+        .expect("Should have general node");
+    let interfaces = general
+        .get_child("interfaces")
+        .expect("Should have interfaces");
+    let iface_value = interfaces.get_text().expect("Should have interface value");
+    assert_eq!(iface_value, "lan");
+
+    // Check per-subnet interface
+    let subnets = dhcp6
+        .get_child("subnets")
+        .expect("Should have subnets node");
+    let subnet6 = subnets
+        .children
+        .iter()
+        .filter_map(|c| c.as_element())
+        .find(|e| e.name == "subnet6")
+        .expect("Should have subnet6");
+    let subnet_iface = subnet6
+        .get_child("interface")
+        .expect("Should have interface in subnet6");
+    let subnet_iface_value = subnet_iface
+        .get_text()
+        .expect("Should have interface value in subnet6");
+    assert_eq!(subnet_iface_value, "lan");
+}
+
+#[test]
+fn test_create_subnets_kea_preserves_existing_interfaces() {
+    let input = Cursor::new(TEST_CREATE_SUBNETS_KEA_V4_EXISTING_INTERFACES);
+    let mut output = Vec::new();
+    let options = MigrationOptions {
+        create_subnets: true,
+        ..Default::default()
+    };
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let kea = root.get_child("Kea").expect("Should have Kea node");
+    let dhcp4 = kea.get_child("dhcp4").expect("Should have dhcp4 node");
+    let general = dhcp4
+        .get_child("general")
+        .expect("Should have general node");
+    let interfaces = general
+        .get_child("interfaces")
+        .expect("Should have interfaces");
+    let iface_value = interfaces
+        .get_text()
+        .expect("Should have interface value")
+        .to_string();
+
+    // Should have both existing (opt1) and new (opt2) interfaces
+    let iface_parts: Vec<&str> = iface_value.split(',').collect();
+    assert_eq!(iface_parts.len(), 2);
+    assert!(iface_parts.contains(&"opt1"));
+    assert!(iface_parts.contains(&"opt2"));
+}
+
+#[test]
+fn test_create_subnets_dnsmasq_adds_interfaces() {
+    let input = Cursor::new(TEST_CREATE_SUBNETS_DNSMASQ_V4);
+    let mut output = Vec::new();
+    let options = dnsmasq_options_create_subnets();
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let dnsmasq = find_descendant_ci(&root, "dnsmasq").expect("Should have dnsmasq node");
+    let interface = dnsmasq
+        .get_child("interface")
+        .expect("Should have interface");
+    let iface_value = interface.get_text().expect("Should have interface value");
+    assert_eq!(iface_value, "opt1");
+}
+
+#[test]
+fn test_create_subnets_dnsmasq_adds_interfaces_v6() {
+    let input = Cursor::new(TEST_CREATE_SUBNETS_DNSMASQ_V6);
+    let mut output = Vec::new();
+    let options = dnsmasq_options_create_subnets();
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let dnsmasq = find_descendant_ci(&root, "dnsmasq").expect("Should have dnsmasq node");
+    let interface = dnsmasq
+        .get_child("interface")
+        .expect("Should have interface");
+    let iface_value = interface.get_text().expect("Should have interface value");
+    assert_eq!(iface_value, "lan");
+}
+
+#[test]
+fn test_create_subnets_dnsmasq_preserves_existing_interfaces() {
+    let input = Cursor::new(TEST_CREATE_SUBNETS_DNSMASQ_V4_EXISTING_INTERFACES);
+    let mut output = Vec::new();
+    let options = dnsmasq_options_create_subnets();
+
+    convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    let output_str = String::from_utf8(output).expect("output should be valid UTF-8");
+    let root =
+        Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
+    let dnsmasq = find_descendant_ci(&root, "dnsmasq").expect("Should have dnsmasq node");
+    let interface = dnsmasq
+        .get_child("interface")
+        .expect("Should have interface");
+    let iface_value = interface
+        .get_text()
+        .expect("Should have interface value")
+        .to_string();
+
+    // Should have both existing (opt1) and new (opt2) interfaces
+    let iface_parts: Vec<&str> = iface_value.split(',').collect();
+    assert_eq!(iface_parts.len(), 2);
+    assert!(iface_parts.contains(&"opt1"));
+    assert!(iface_parts.contains(&"opt2"));
+}

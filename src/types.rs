@@ -66,16 +66,23 @@ pub struct SubnetV6 {
 pub type KeaSubnet = Subnet;
 pub type KeaSubnetV6 = SubnetV6;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MigrationStats {
     pub isc_mappings_found: usize,
     pub isc_mappings_v6_found: usize,
+    pub isc_ranges_found: usize,
+    pub isc_ranges_v6_found: usize,
     pub target_subnets_found: usize,
     pub target_subnets_v6_found: usize,
     pub reservations_to_create: usize,
     pub reservations_v6_to_create: usize,
     pub reservations_skipped: usize,
     pub reservations_v6_skipped: usize,
+    pub interfaces_configured: Vec<String>,
+    pub isc_disabled_v4: Vec<String>,
+    pub isc_disabled_v6: Vec<String>,
+    pub backend_enabled_v4: bool,
+    pub backend_enabled_v6: bool,
 }
 
 use crate::backend::Backend;
@@ -89,4 +96,5 @@ pub struct MigrationOptions {
     pub force_subnets: bool,
     pub create_options: bool,
     pub force_options: bool,
+    pub enable_backend: bool,
 }
