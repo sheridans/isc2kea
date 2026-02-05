@@ -732,16 +732,12 @@ fn test_enable_backend_kea_disables_isc() {
     let root =
         Element::parse(Cursor::new(output_str.as_bytes())).expect("output should be valid XML");
 
-    // Check ISC DHCP is disabled on opt1
+    // Check ISC DHCP is disabled on opt1 (enable tag removed)
     let dhcpd = root.get_child("dhcpd").expect("Should have dhcpd node");
     let opt1 = dhcpd.get_child("opt1").expect("Should have opt1 node");
-    let enable = opt1
-        .get_child("enable")
-        .expect("Should have enable element");
-    let enable_value = enable.get_text().unwrap_or_default();
     assert!(
-        enable_value.is_empty(),
-        "ISC DHCP should be disabled (empty enable)"
+        opt1.get_child("enable").is_none(),
+        "ISC DHCP should be disabled (missing enable)"
     );
 }
 
@@ -757,6 +753,7 @@ fn test_enable_backend_kea_disables_isc_without_ranges() {
     </interfaces>
     <dhcpd>
         <opt1>
+            <enable>1</enable>
             <staticmap>
                 <mac>04:d9:f5:cb:9b:54</mac>
                 <ipaddr>10.22.1.50</ipaddr>
@@ -798,6 +795,7 @@ fn test_enable_backend_kea_sets_enabled_tag() {
     </interfaces>
     <dhcpd>
         <opt1>
+            <enable>1</enable>
             <range>
                 <from>10.22.1.100</from>
                 <to>10.22.1.200</to>

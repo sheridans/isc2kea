@@ -110,6 +110,51 @@ fn run_with_args_scan_missing_input() {
 }
 
 #[test]
+fn run_with_args_verify_shows_diff() {
+    let input = write_temp_file(
+        "verify_in",
+        r#"<?xml version="1.0"?>
+<opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
+  <dhcpd>
+    <lan>
+      <staticmap>
+        <mac>00:11:22:33:44:55</mac>
+        <ipaddr>192.168.1.10</ipaddr>
+        <hostname>testhost</hostname>
+      </staticmap>
+    </lan>
+  </dhcpd>
+  <Kea>
+    <dhcp4>
+      <subnets>
+        <subnet4 uuid="test-subnet">
+          <subnet>192.168.1.0/24</subnet>
+        </subnet4>
+      </subnets>
+      <reservations></reservations>
+    </dhcp4>
+  </Kea>
+</opnsense>
+"#,
+    );
+
+    let result = run_with_args([
+        "isc2kea",
+        "verify",
+        "--in",
+        input.to_str().unwrap(),
+        "--quiet",
+    ]);
+    assert!(result.is_err());
+}
+
+#[test]
 fn run_with_args_convert_writes_output() {
     let input = write_temp_file(
         "convert_ok_in",
@@ -156,6 +201,53 @@ fn run_with_args_convert_writes_output() {
 
     assert!(result.is_ok());
     assert!(output_path.exists());
+}
+
+#[test]
+fn run_with_args_convert_cleans_temp_on_failure() {
+    let input = write_temp_file(
+        "convert_fail_in",
+        r#"<?xml version="1.0"?>
+<opnsense>
+  <interfaces>
+    <lan>
+      <ipaddr>192.168.1.1</ipaddr>
+      <subnet>24</subnet>
+    </lan>
+  </interfaces>
+  <dhcpd>
+    <lan>
+      <staticmap>
+        <mac>00:11:22:33:44:55</mac>
+        <ipaddr>192.168.1.10</ipaddr>
+        <hostname>testhost</hostname>
+      </staticmap>
+    </lan>
+  </dhcpd>
+</opnsense>
+"#,
+    );
+    let output_path = temp_path("convert_fail_out");
+    let tmp_path = output_path.with_extension(format!("tmp.{}", std::process::id()));
+
+    let result = run_with_args([
+        "isc2kea",
+        "convert",
+        "--in",
+        input.to_str().unwrap(),
+        "--out",
+        output_path.to_str().unwrap(),
+    ]);
+
+    assert!(result.is_err());
+    assert!(
+        !output_path.exists(),
+        "output should not be created on failure"
+    );
+    assert!(
+        !tmp_path.exists(),
+        "temporary output should be removed on failure"
+    );
 }
 
 #[test]

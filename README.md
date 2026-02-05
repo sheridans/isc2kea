@@ -1,5 +1,8 @@
 # isc2kea
 
+![CI](https://github.com/sheridans/isc2kea/actions/workflows/ci.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/sheridans/isc2kea?display_name=tag)
+
 An OPNsense ISC DHCP to Kea/dnsmasq migration tool for DHCPv4 and DHCPv6.
 
 OPNsense is deprecating ISC DHCP (isc-dhcp) in favor of Kea. This tool reads your `config.xml` and migrates your ISC DHCP configuration (static mappings, subnets, ranges, and DHCP options) into Kea reservations or dnsmasq host entries. It handles both IPv4 and IPv6, and can:
@@ -19,7 +22,7 @@ OPNsense is deprecating ISC DHCP (isc-dhcp) in favor of Kea. This tool reads you
 2. Download `config.xml` from the OPNsense UI.
 3. Kea does not need to be enabled yet. You can review the migrated config before disabling ISC DHCP and enabling Kea.
 
-Add `--create-subnets` to create Kea subnets from your ISC config (or create them in OPNsense first). Add `--create-options` to also copy DHCP options (DNS, gateway, NTP, etc.). Drop either flag if you don't need it.
+Add `--create-subnets` to create Kea subnets from your ISC config (or create them in OPNsense first). Add `--create-options` to copy DHCP options (DNS, gateway, NTP, etc.). Drop either flag if you don't need it.
 
 ```bash
 # 1. Preview what would be migrated (no changes made)
@@ -28,6 +31,7 @@ isc2kea scan --in ./config.xml --create-subnets --create-options
 # 2. Perform the migration
 isc2kea convert --in ./config.xml --out ./config.xml.new --create-subnets --create-options
 ```
+Review `config.xml.new` before disabling ISC DHCP and enabling Kea. When you're ready, use `--enable-backend` to automate the switch.
 
 ### Migrate to dnsmasq
 
@@ -35,7 +39,7 @@ isc2kea convert --in ./config.xml --out ./config.xml.new --create-subnets --crea
 2. Download `config.xml` from the OPNsense UI.
 3. Make sure `<dnsmasq>` exists in your `config.xml`. It does not need to be enabled yet. You can review the migrated config before disabling ISC DHCP and enabling dnsmasq.
 
-Add `--create-subnets` to create dnsmasq ranges from your ISC config (or create them in OPNsense first). Add `--create-options` to also copy DHCP options. Drop either flag if you don't need it.
+Add `--create-subnets` to create dnsmasq ranges from your ISC config (or create them in OPNsense first). Add `--create-options` to copy DHCP options. Drop either flag if you don't need it.
 
 ```bash
 # 1. Preview
@@ -44,16 +48,19 @@ isc2kea scan --in ./config.xml --backend dnsmasq --create-subnets --create-optio
 # 2. Convert
 isc2kea convert --in ./config.xml --out ./config.xml.new --backend dnsmasq --create-subnets --create-options
 ```
+Review `config.xml.new` before disabling ISC DHCP and enabling dnsmasq. When you're ready, use `--enable-backend` to automate the switch.
 
 ### Then what?
 
 1. Review the new file and compare it to your original
 2. Upload `config.xml.new` via the OPNsense UI (replacing the original)
-3. Disable ISC DHCP and enable Kea (or dnsmasq) when you're happy with the config
+3. Disable ISC DHCP and enable Kea (or dnsmasq) when you're happy with the config (or use `--enable-backend`)
 4. Reboot or reload the DHCP service
 5. Leases will appear after clients renew (you may need to renew or reboot clients)
 
-**Tip:** Use `--enable-backend` to automatically disable ISC DHCP on migrated interfaces and enable the target backend. Combined with `--create-subnets`, this handles interface selection too — no manual UI steps needed.
+**Tip:** Use `--enable-backend` to automatically disable ISC DHCP on interfaces enabled in your ISC config and enable the target backend. If you also use `--create-subnets`, the backend listening interfaces are configured automatically — no manual UI steps needed.
+
+**Note:** `--enable-backend` is intended for the initial cutover from ISC. If ISC is already disabled, the tool will refuse to enable another backend to avoid dual‑DHCP. For repeat runs, omit `--enable-backend` and manage backend switches manually.
 
 **Note: leases are not migrated.** The tool converts configuration only. Existing DHCP leases from ISC DHCP will not carry over — clients will request new leases from the new backend.
 
@@ -83,6 +90,7 @@ cargo build --release
 |---------|-------------|
 | `scan` | Read-only preview. Shows what would be migrated without changing anything. |
 | `convert` | Performs the migration and writes the result to a new file. |
+| `verify` | Show a diff of what would change without writing any files (exit code 1 if changes). |
 
 ### Flags
 
@@ -96,7 +104,7 @@ cargo build --release
 | `--create-options` | Copy DHCP options (DNS servers, gateway, etc.) from ISC to the target backend. |
 | `--force-options` | Overwrite existing DHCP options (use with `--create-options`). |
 | `--fail-if-existing` | Abort if any reservations/hosts already exist in the target backend. |
-| `--enable-backend` | Disable ISC DHCP on migrated interfaces and enable the target backend. |
+| `--enable-backend` | Disable ISC DHCP on interfaces enabled in the ISC config and enable the target backend (convert only). |
 | `--force` | Overwrite the output file if it already exists (convert only). |
 | `--verbose` | Show details for each individual mapping. |
 
@@ -137,34 +145,147 @@ isc2kea convert --in ./config.xml --out ./config.xml.new --backend dnsmasq --cre
 
 The tool checks that each fixed IP assignment actually belongs to the correct network interface. For example, if a device with IP `10.0.0.50` is listed under your `lan` interface but `lan` is a `192.168.1.0/24` network, the tool will abort and tell you exactly which entry has the mismatch. This prevents devices from being silently assigned to the wrong subnet.
 
+### Workflows / Cookbook
+
+Common workflows you can copy/paste:
+
+1. **Preview only (no changes)**
+
+```bash
+isc2kea scan --in ./config.xml
+```
+
+2. **Verify (diff only, no files written)**
+
+```bash
+isc2kea verify --in ./config.xml --create-subnets --create-options
+```
+Use `--quiet` to suppress diff output; exit code is 1 if changes are detected.
+
+Example output (trimmed):
+
+```diff
+--- original
++++ converted
+@@ -374,7 +374,7 @@
+   <dhcpd>
+     <lan>
+-      <enable>1</enable>
++      <enable />
+@@ -1430,19 +1430,38 @@
+     <Kea>
+       <dhcp4 persisted_at="..." version="...">
+         <general>
+-          <enabled>0</enabled>
++          <enabled>1</enabled>
+@@
+-          <interfaces />
++          <interfaces>lan,opt1</interfaces>
+@@
+-        <subnets />
++        <subnets>
++          <subnet4 uuid="...">
++            <subnet>192.168.69.0/24</subnet>
++            <pools>192.168.69.100-192.168.69.200</pools>
++            <option_data>...</option_data>
++          </subnet4>
++        </subnets>
+```
+
+3. **Convert and review (no backend enable)**
+
+```bash
+isc2kea convert --in ./config.xml --out ./config.xml.new --create-subnets --create-options
+```
+
+4. **Convert and enable Kea (ISC → Kea)**
+
+```bash
+isc2kea convert --in ./config.xml --out ./config.xml.new \
+  --backend kea \
+  --create-subnets \
+  --create-options \
+  --enable-backend
+```
+
+5. **Convert and enable dnsmasq (ISC → dnsmasq)**
+
+```bash
+isc2kea convert --in ./config.xml --out ./config.xml.new \
+  --backend dnsmasq \
+  --create-subnets \
+  --create-options \
+  --enable-backend
+```
+
+6. **Create subnets/ranges only**
+
+```bash
+isc2kea convert --in ./config.xml --out ./config.xml.new --create-subnets
+```
+
+7. **Create DHCP options only**
+
+```bash
+isc2kea convert --in ./config.xml --out ./config.xml.new --create-options
+```
+
+8. **Force replace existing subnets/options**
+
+```bash
+isc2kea convert --in ./config.xml --out ./config.xml.new \
+  --create-subnets --force-subnets \
+  --create-options --force-options
+```
+
 ### Scripted Usage
 
 The tool is non-interactive and can be used in scripts to migrate multiple firewalls:
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 FIREWALLS="fw1.example.com fw2.example.com fw3.example.com"
+ISC2KEA="isc2kea"
+BACKEND="kea" # or "dnsmasq"
+CONVERT_ARGS=(--backend "$BACKEND" --create-subnets --create-options --enable-backend --force)
+VERIFY_ARGS=(--backend "$BACKEND" --create-subnets --create-options --quiet)
 
 for fw in $FIREWALLS; do
-    echo "Migrating $fw..."
+    echo "[$fw] Migrating..."
 
     # Download config
+    echo "[$fw] Downloading config..."
     scp root@$fw:/conf/config.xml /tmp/${fw}-config.xml
 
     # Convert (--force overwrites existing output file)
-    isc2kea convert \
+    echo "[$fw] Converting config..."
+    "$ISC2KEA" convert \
         --in /tmp/${fw}-config.xml \
         --out /tmp/${fw}-config.xml.new \
-        --create-subnets \
-        --create-options \
-        --enable-backend \
-        --force
+        "${CONVERT_ARGS[@]}"
+
+    # Verify converted config is stable (idempotent) before touching the firewall
+    echo "[$fw] Verifying converted config..."
+    if ! "$ISC2KEA" verify \
+        --in /tmp/${fw}-config.xml.new \
+        "${VERIFY_ARGS[@]}"; then
+        echo "[$fw] Verify failed; skipping upload/reboot"
+        continue
+    fi
 
     # Upload modified config
+    echo "[$fw] Uploading config..."
     scp /tmp/${fw}-config.xml.new root@$fw:/conf/config.xml
 
-    # Reboot to apply (or use configctl to reload services)
-    ssh root@$fw "configctl system reboot"
+    # Restart services in a safe order: stop ISC first, then start target backend
+    if [ "$BACKEND" = "kea" ]; then
+        echo "[$fw] Restarting services: dhcpd, dhcpd6, kea..."
+        ssh root@$fw "configctl dhcpd restart && configctl dhcpd6 restart && configctl kea restart"
+    else
+        echo "[$fw] Restarting services: dhcpd, dhcpd6, dnsmasq..."
+        ssh root@$fw "configctl dhcpd restart && configctl dhcpd6 restart && configctl dnsmasq restart"
+    fi
 done
 ```
 
@@ -175,12 +296,21 @@ You can also use the OPNsense API to download and upload configs instead of SCP.
 ```
 ISC DHCP static mappings found: 45
 ISC DHCPv6 static mappings found: 12
+ISC DHCP ranges found: 3
+ISC DHCPv6 ranges found: 2
 Kea subnet4 entries found: 3
 Kea subnet6 entries found: 2
 Reservations that would be created: 43
 Reservations (v6) that would be created: 10
 Reservations skipped (already exist): 2
 Reservations skipped (v6): 2
+```
+
+With `--verbose`, scan also prints enabled ISC interfaces:
+
+```
+ISC DHCP enabled interfaces (v4): lan, opt1, opt2
+ISC DHCP enabled interfaces (v6): lan
 ```
 
 ### Sample output (convert)
@@ -338,7 +468,7 @@ dnsmasq option mapping:
 
 - The output XML may have different whitespace/indentation than the original. This is cosmetic and does not affect OPNsense.
 - When multiple subnets overlap, the most specific one (longest prefix) is used.
-- Tested against real OPNsense `config.xml` files from 25.7 and 26.1. An example config from a live OPNsense 25.7.11 system is included in `example/live.xml`.
+- Tested against real OPNsense `config.xml` files from 25.7 and 26.1.
 - XML layouts may change in future OPNsense releases; revalidate before using with newer versions.
 
 ## License

@@ -70,6 +70,8 @@ pub type KeaSubnetV6 = SubnetV6;
 pub struct MigrationStats {
     pub isc_mappings_found: usize,
     pub isc_mappings_v6_found: usize,
+    pub isc_ranges_found: usize,
+    pub isc_ranges_v6_found: usize,
     pub target_subnets_found: usize,
     pub target_subnets_v6_found: usize,
     pub reservations_to_create: usize,

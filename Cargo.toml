@@ -18,3 +18,4 @@ thiserror = "1.0"
 xmltree = "0.10"
 ipnet = "2.9"
 uuid = { version = "1.11", features = ["v4"] }
+similar = "2.5"
