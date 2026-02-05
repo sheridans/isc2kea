@@ -937,3 +937,29 @@ pub const TEST_CREATE_SUBNETS_KEA_V4_EXISTING_INTERFACES: &str = r#"<?xml versio
     </Kea>
 </opnsense>
 "#;
+
+pub const TEST_CREATE_SUBNETS_DNSMASQ_V4_EXISTING_INTERFACES: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+        <opt2>
+            <ipaddr>10.22.2.1</ipaddr>
+            <subnet>24</subnet>
+        </opt2>
+    </interfaces>
+    <dhcpd>
+        <opt2>
+            <range>
+                <from>10.22.2.100</from>
+                <to>10.22.2.200</to>
+            </range>
+        </opt2>
+    </dhcpd>
+    <dnsmasq>
+        <interface>opt1</interface>
+    </dnsmasq>
+</opnsense>
+"#;

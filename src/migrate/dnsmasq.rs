@@ -20,7 +20,10 @@ use crate::{IscStaticMap, IscStaticMapV6, MigrationError, MigrationOptions, Migr
 use super::options::{
     dnsmasq_option_key_from_elem, dnsmasq_option_specs_from_isc, DnsmasqOptionSpec,
 };
-use super::subnets::{cidr_prefix_v4, cidr_prefix_v6, desired_subnets_v4, desired_subnets_v6};
+use super::subnets::{
+    cidr_prefix_v4, cidr_prefix_v6, desired_subnets_v4, desired_subnets_v6, DesiredSubnetV4,
+    DesiredSubnetV6,
+};
 use super::utils::{validate_mapping_ifaces_v4, validate_mapping_ifaces_v6};
 
 fn range_key(iface: &str, start: &str, end: &str, prefix_len: &str, mask: &str) -> String {
@@ -549,6 +552,10 @@ pub(crate) fn convert_dnsmasq(
         }
     }
 
+    if options.create_subnets {
+        apply_dnsmasq_interfaces(root, &desired_v4, &desired_v6)?;
+    }
+
     Ok(MigrationStats {
         isc_mappings_found: isc_mappings.len(),
         isc_mappings_v6_found: isc_mappings_v6.len(),
@@ -559,4 +566,55 @@ pub(crate) fn convert_dnsmasq(
         reservations_skipped: skipped,
         reservations_v6_skipped: skipped_v6,
     })
+}
+
+/// Populate `<dnsmasq><interface>` with interfaces from desired subnets.
+///
+/// This sets the global listening interfaces for dnsmasq DHCP service.
+/// Without this, firewall rules won't be created for DHCP on those interfaces.
+pub(crate) fn apply_dnsmasq_interfaces(
+    root: &mut Element,
+    desired_v4: &[DesiredSubnetV4],
+    desired_v6: &[DesiredSubnetV6],
+) -> Result<()> {
+    // Collect unique interfaces from both v4 and v6 subnets
+    let mut ifaces: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for subnet in desired_v4 {
+        ifaces.insert(subnet.iface.clone());
+    }
+    for subnet in desired_v6 {
+        ifaces.insert(subnet.iface.clone());
+    }
+
+    if ifaces.is_empty() {
+        return Ok(());
+    }
+
+    let dnsmasq_node = get_dnsmasq_node(root)?;
+
+    // Get existing interfaces and merge
+    let existing = crate::xml_helpers::get_child_ci(dnsmasq_node, "interface")
+        .and_then(|e| e.get_text())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+
+    for iface in existing.split(',').filter(|s| !s.is_empty()) {
+        ifaces.insert(iface.to_string());
+    }
+
+    // Remove existing interface element if present
+    dnsmasq_node
+        .children
+        .retain(|c| c.as_element().is_none_or(|e| e.name != "interface"));
+
+    // Add merged interfaces
+    let mut ifaces_elem = Element::new("interface");
+    let mut sorted_ifaces: Vec<_> = ifaces.into_iter().collect();
+    sorted_ifaces.sort();
+    ifaces_elem
+        .children
+        .push(XMLNode::Text(sorted_ifaces.join(",")));
+    dnsmasq_node.children.push(XMLNode::Element(ifaces_elem));
+
+    Ok(())
 }
