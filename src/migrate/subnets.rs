@@ -277,20 +277,26 @@ pub(crate) fn cidr_prefix_v6(cidr: &str) -> Result<u8> {
     Ok(net.prefix_len())
 }
 
+/// Configure Kea listening interfaces from desired subnets.
+/// Returns list of interfaces that were configured.
 pub(crate) fn apply_kea_interfaces(
     root: &mut Element,
     desired_v4: &[DesiredSubnetV4],
     desired_v6: &[DesiredSubnetV6],
-) -> Result<()> {
-    // Collect unique interfaces from desired subnets
+) -> Result<Vec<String>> {
+    // Collect unique interfaces from desired subnets (for return value)
+    let mut all_ifaces: std::collections::HashSet<String> = std::collections::HashSet::new();
+
     let mut ifaces_v4: std::collections::HashSet<String> = std::collections::HashSet::new();
     for subnet in desired_v4 {
         ifaces_v4.insert(subnet.iface.clone());
+        all_ifaces.insert(subnet.iface.clone());
     }
 
     let mut ifaces_v6: std::collections::HashSet<String> = std::collections::HashSet::new();
     for subnet in desired_v6 {
         ifaces_v6.insert(subnet.iface.clone());
+        all_ifaces.insert(subnet.iface.clone());
     }
 
     // Apply v4 interfaces
@@ -351,5 +357,7 @@ pub(crate) fn apply_kea_interfaces(
         general.children.push(XMLNode::Element(ifaces_elem));
     }
 
-    Ok(())
+    let mut result: Vec<_> = all_ifaces.into_iter().collect();
+    result.sort();
+    Ok(result)
 }

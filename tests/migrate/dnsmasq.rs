@@ -350,3 +350,51 @@ fn test_enable_backend_dnsmasq_disables_isc() {
         "ISC DHCP should be disabled (empty enable)"
     );
 }
+
+#[test]
+fn test_enable_backend_dnsmasq_disables_isc_without_ranges() {
+    let xml_no_ranges = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+    </interfaces>
+    <dhcpd>
+        <opt1>
+            <staticmap>
+                <mac>04:d9:f5:cb:9b:54</mac>
+                <ipaddr>10.22.1.50</ipaddr>
+            </staticmap>
+        </opt1>
+    </dhcpd>
+    <dnsmasq></dnsmasq>
+</opnsense>
+"#;
+
+    let input = Cursor::new(xml_no_ranges);
+    let mut output = Vec::new();
+    let mut options = dnsmasq_options();
+    options.enable_backend = true;
+
+    let stats = convert_config(input, &mut output, &options).expect("convert should succeed");
+    assert_eq!(stats.isc_disabled_v4, vec!["opt1"]);
+}
+
+#[test]
+fn test_enable_backend_dnsmasq_stats() {
+    let input = Cursor::new(TEST_ENABLE_BACKEND_DNSMASQ);
+    let mut output = Vec::new();
+    let mut options = dnsmasq_options();
+    options.create_subnets = true;
+    options.enable_backend = true;
+
+    let stats = convert_config(input, &mut output, &options).expect("convert should succeed");
+
+    assert_eq!(stats.interfaces_configured, vec!["opt1"]);
+    assert_eq!(stats.isc_disabled_v4, vec!["opt1"]);
+    assert!(stats.isc_disabled_v6.is_empty());
+    assert!(stats.backend_enabled_v4);
+    assert!(stats.backend_enabled_v6);
+}

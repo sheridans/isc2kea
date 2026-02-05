@@ -40,6 +40,7 @@ pub fn scan_counts<R: Read>(reader: R, backend: &Backend) -> Result<MigrationSta
         reservations_v6_to_create: 0,
         reservations_skipped: 0,
         reservations_v6_skipped: 0,
+        ..Default::default()
     })
 }
 

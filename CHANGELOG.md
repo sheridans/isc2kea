@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [1.1.3] - 2026-02-05
+
+- Add automatic interface assignment for Kea when using `--create-subnets` (populates listening interfaces).
+- Add automatic interface assignment for dnsmasq when using `--create-subnets`.
+- Add `--enable-backend` flag to disable ISC DHCP on migrated interfaces and enable the target backend.
+
 ## [1.1.2] - 2026-02-04
 
 - Enforce strict interface validation to prevent assigning reservations to the wrong interface.

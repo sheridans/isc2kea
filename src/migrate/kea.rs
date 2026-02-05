@@ -13,7 +13,7 @@ use crate::subnet::{find_subnet_for_ip, find_subnet_for_ip_v6};
 use crate::{IscStaticMap, IscStaticMapV6, MigrationError, MigrationOptions, MigrationStats};
 
 use super::options::apply_kea_options;
-use super::services::{disable_isc_dhcp, enable_kea};
+use super::services::{disable_isc_dhcp_from_config, enable_kea};
 use super::subnets::{
     apply_kea_interfaces, apply_kea_subnets, desired_subnets_v4, desired_subnets_v6,
 };
@@ -255,6 +255,7 @@ pub(crate) fn scan_kea(
         reservations_v6_to_create: to_create_v6,
         reservations_skipped: skipped,
         reservations_v6_skipped: skipped_v6,
+        ..Default::default()
     })
 }
 
@@ -272,12 +273,13 @@ pub(crate) fn convert_kea(
     let existing_duids_v6 = extract_existing_reservation_duids_v6(root)?;
     let iface_cidrs_v4 = extract_interface_cidrs(root)?;
     let iface_cidrs_v6 = extract_interface_cidrs_v6(root)?;
-    let desired_v4 = if options.create_subnets {
+    let want_desired = options.create_subnets || options.enable_backend;
+    let desired_v4 = if want_desired {
         desired_subnets_v4(root)?
     } else {
         Vec::new()
     };
-    let desired_v6 = if options.create_subnets {
+    let desired_v6 = if want_desired {
         desired_subnets_v6(root)?
     } else {
         Vec::new()
@@ -292,6 +294,7 @@ pub(crate) fn convert_kea(
     } else {
         Vec::new()
     };
+    let mut interfaces_configured = Vec::new();
     if options.create_subnets {
         apply_kea_subnets(
             root,
@@ -301,7 +304,7 @@ pub(crate) fn convert_kea(
             &desired_v6,
             options,
         )?;
-        apply_kea_interfaces(root, &desired_v4, &desired_v6)?;
+        interfaces_configured = apply_kea_interfaces(root, &desired_v4, &desired_v6)?;
     }
 
     if options.create_options {
@@ -478,9 +481,29 @@ pub(crate) fn convert_kea(
         }
     }
 
+    let mut isc_disabled_v4 = Vec::new();
+    let mut isc_disabled_v6 = Vec::new();
+    let mut backend_enabled_v4 = false;
+    let mut backend_enabled_v6 = false;
     if options.enable_backend {
-        disable_isc_dhcp(root, &desired_v4, &desired_v6)?;
-        enable_kea(root, !kea_subnets.is_empty(), !kea_subnets_v6.is_empty())?;
+        let (disabled_v4, disabled_v6) = disable_isc_dhcp_from_config(root)?;
+        isc_disabled_v4 = disabled_v4;
+        isc_disabled_v6 = disabled_v6;
+        let (enabled_v4, enabled_v6) =
+            enable_kea(root, !kea_subnets.is_empty(), !kea_subnets_v6.is_empty())?;
+        backend_enabled_v4 = enabled_v4;
+        backend_enabled_v6 = enabled_v6;
+
+        if !kea_subnets.is_empty() && !backend_enabled_v4 {
+            return Err(anyhow!(
+                "Failed to enable Kea DHCPv4. Check for missing <general><enabled>."
+            ));
+        }
+        if !kea_subnets_v6.is_empty() && !backend_enabled_v6 {
+            return Err(anyhow!(
+                "Failed to enable Kea DHCPv6. Check for missing <general><enabled>."
+            ));
+        }
     }
 
     Ok(MigrationStats {
@@ -492,5 +515,10 @@ pub(crate) fn convert_kea(
         reservations_v6_to_create: to_create_v6,
         reservations_skipped: skipped,
         reservations_v6_skipped: skipped_v6,
+        interfaces_configured,
+        isc_disabled_v4,
+        isc_disabled_v6,
+        backend_enabled_v4,
+        backend_enabled_v6,
     })
 }

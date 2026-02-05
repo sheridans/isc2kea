@@ -53,10 +53,7 @@ isc2kea convert --in ./config.xml --out ./config.xml.new --backend dnsmasq --cre
 4. Reboot or reload the DHCP service
 5. Leases will appear after clients renew (you may need to renew or reboot clients)
 
-**Important: select your DHCP interfaces before enabling the new backend.** The tool does not configure which interfaces Kea or dnsmasq listens on. Without this, DHCP will not serve any clients.
-
-- **Kea**: Services > Kea DHCP > Settings > Interfaces
-- **dnsmasq**: Services > Dnsmasq DNS > Settings > Interfaces
+**Tip:** Use `--enable-backend` to automatically disable ISC DHCP on migrated interfaces and enable the target backend. Combined with `--create-subnets`, this handles interface selection too — no manual UI steps needed.
 
 **Note: leases are not migrated.** The tool converts configuration only. Existing DHCP leases from ISC DHCP will not carry over — clients will request new leases from the new backend.
 
@@ -99,6 +96,7 @@ cargo build --release
 | `--create-options` | Copy DHCP options (DNS servers, gateway, etc.) from ISC to the target backend. |
 | `--force-options` | Overwrite existing DHCP options (use with `--create-options`). |
 | `--fail-if-existing` | Abort if any reservations/hosts already exist in the target backend. |
+| `--enable-backend` | Disable ISC DHCP on migrated interfaces and enable the target backend. |
 | `--force` | Overwrite the output file if it already exists (convert only). |
 | `--verbose` | Show details for each individual mapping. |
 
@@ -108,6 +106,7 @@ By default, Kea subnets or dnsmasq ranges must already exist in your config befo
 
 - **Subnets** are built from each network interface's IP address and prefix length (from `<interfaces>` in your config).
 - **Pools/ranges** are copied from your ISC DHCP `<range>` entries.
+- **Interfaces** are automatically configured so the backend listens on the correct networks.
 - Existing subnets are left alone. New ones are only added if they don't already exist. Use `--force-subnets` to replace existing ones instead.
 
 ```bash
@@ -138,6 +137,39 @@ isc2kea convert --in ./config.xml --out ./config.xml.new --backend dnsmasq --cre
 
 The tool checks that each fixed IP assignment actually belongs to the correct network interface. For example, if a device with IP `10.0.0.50` is listed under your `lan` interface but `lan` is a `192.168.1.0/24` network, the tool will abort and tell you exactly which entry has the mismatch. This prevents devices from being silently assigned to the wrong subnet.
 
+### Scripted Usage
+
+The tool is non-interactive and can be used in scripts to migrate multiple firewalls:
+
+```bash
+#!/bin/bash
+FIREWALLS="fw1.example.com fw2.example.com fw3.example.com"
+
+for fw in $FIREWALLS; do
+    echo "Migrating $fw..."
+
+    # Download config
+    scp root@$fw:/conf/config.xml /tmp/${fw}-config.xml
+
+    # Convert (--force overwrites existing output file)
+    isc2kea convert \
+        --in /tmp/${fw}-config.xml \
+        --out /tmp/${fw}-config.xml.new \
+        --create-subnets \
+        --create-options \
+        --enable-backend \
+        --force
+
+    # Upload modified config
+    scp /tmp/${fw}-config.xml.new root@$fw:/conf/config.xml
+
+    # Reboot to apply (or use configctl to reload services)
+    ssh root@$fw "configctl system reboot"
+done
+```
+
+You can also use the OPNsense API to download and upload configs instead of SCP.
+
 ### Sample output (scan)
 
 ```
@@ -149,6 +181,23 @@ Reservations that would be created: 43
 Reservations (v6) that would be created: 10
 Reservations skipped (already exist): 2
 Reservations skipped (v6): 2
+```
+
+### Sample output (convert)
+
+```
+Migration completed successfully!
+ISC DHCP static mappings found: 45
+ISC DHCPv6 static mappings found: 12
+Kea subnet4 entries found: 3
+Kea subnet6 entries found: 2
+Reservations created: 43
+Reservations created (v6): 10
+Reservations skipped (already exist): 2
+Reservations skipped (v6): 2
+Interfaces configured: lan, opt1, opt2
+ISC DHCP disabled (v4): lan, opt1, opt2
+Backend DHCP enabled (v4): yes
 ```
 
 ## What Gets Migrated

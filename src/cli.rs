@@ -224,32 +224,27 @@ where
             let input_file = File::open(&r#in)
                 .with_context(|| format!("Failed to open input file: {}", r#in.display()))?;
 
-            // Safer output creation: fail if exists unless --force
-            let output_file = if force {
-                OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(&out)
-                    .with_context(|| {
-                        format!("Failed to open output file for writing: {}", out.display())
-                    })?
-            } else {
-                match OpenOptions::new().write(true).create_new(true).open(&out) {
-                    Ok(file) => file,
-                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
-                        bail!(
-                            "Output file already exists: {} (use --force to overwrite)",
-                            out.display()
-                        );
-                    }
-                    Err(e) => {
-                        return Err(e).with_context(|| {
-                            format!("Failed to create output file: {}", out.display())
-                        });
-                    }
-                }
-            };
+            if !force && out.exists() {
+                bail!(
+                    "Output file already exists: {} (use --force to overwrite)",
+                    out.display()
+                );
+            }
+
+            let tmp_path = out.with_extension(format!(
+                "tmp.{}",
+                std::process::id()
+            ));
+            let mut tmp_file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmp_path)
+                .with_context(|| {
+                    format!(
+                        "Failed to create temporary output file: {}",
+                        tmp_path.display()
+                    )
+                })?;
 
             let options = MigrationOptions {
                 fail_if_existing,
@@ -262,7 +257,36 @@ where
                 enable_backend,
             };
 
-            let stats = convert_config(input_file, output_file, &options)?;
+            let stats = match convert_config(input_file, &mut tmp_file, &options) {
+                Ok(stats) => stats,
+                Err(e) => {
+                    let _ = std::fs::remove_file(&tmp_path);
+                    return Err(e);
+                }
+            };
+
+            if let Err(e) = tmp_file.sync_all() {
+                let _ = std::fs::remove_file(&tmp_path);
+                return Err(e).with_context(|| {
+                    format!(
+                        "Failed to sync temporary output file: {}",
+                        tmp_path.display()
+                    )
+                });
+            }
+
+            if force && out.exists() {
+                std::fs::remove_file(&out).with_context(|| {
+                    format!("Failed to remove existing output file: {}", out.display())
+                })?;
+            }
+
+            std::fs::rename(&tmp_path, &out).with_context(|| {
+                format!(
+                    "Failed to replace output file: {}",
+                    out.display()
+                )
+            })?;
 
             println!("\nMigration completed successfully!");
             print_convert_stats(&stats, &backend);
@@ -306,6 +330,31 @@ fn print_scan_stats(stats: &MigrationStats, backend: &Backend) {
         "Reservations skipped (v6): {}",
         stats.reservations_v6_skipped
     );
+
+    if !stats.interfaces_configured.is_empty() {
+        println!(
+            "Interfaces configured: {}",
+            stats.interfaces_configured.join(", ")
+        );
+    }
+    if !stats.isc_disabled_v4.is_empty() {
+        println!(
+            "ISC DHCP disabled (v4): {}",
+            stats.isc_disabled_v4.join(", ")
+        );
+    }
+    if !stats.isc_disabled_v6.is_empty() {
+        println!(
+            "ISC DHCP disabled (v6): {}",
+            stats.isc_disabled_v6.join(", ")
+        );
+    }
+    if stats.backend_enabled_v4 {
+        println!("Backend DHCP enabled (v4): yes");
+    }
+    if stats.backend_enabled_v6 {
+        println!("Backend DHCP enabled (v6): yes");
+    }
 }
 
 fn print_convert_stats(stats: &MigrationStats, backend: &Backend) {

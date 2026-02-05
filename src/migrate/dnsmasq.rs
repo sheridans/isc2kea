@@ -20,7 +20,7 @@ use crate::{IscStaticMap, IscStaticMapV6, MigrationError, MigrationOptions, Migr
 use super::options::{
     dnsmasq_option_key_from_elem, dnsmasq_option_specs_from_isc, DnsmasqOptionSpec,
 };
-use super::services::{disable_isc_dhcp, enable_dnsmasq};
+use super::services::{disable_isc_dhcp_from_config, enable_dnsmasq};
 use super::subnets::{
     cidr_prefix_v4, cidr_prefix_v6, desired_subnets_v4, desired_subnets_v6, DesiredSubnetV4,
     DesiredSubnetV6,
@@ -234,6 +234,7 @@ pub(crate) fn scan_dnsmasq(
         reservations_v6_to_create: to_create_v6,
         reservations_skipped: skipped,
         reservations_v6_skipped: skipped_v6,
+        ..Default::default()
     })
 }
 
@@ -244,12 +245,13 @@ pub(crate) fn convert_dnsmasq(
     isc_mappings_v6: &[IscStaticMapV6],
     options: &MigrationOptions,
 ) -> Result<MigrationStats> {
-    let desired_v4 = if options.create_subnets {
+    let want_desired = options.create_subnets || options.enable_backend;
+    let desired_v4 = if want_desired {
         desired_subnets_v4(root)?
     } else {
         Vec::new()
     };
-    let desired_v6 = if options.create_subnets {
+    let desired_v6 = if want_desired {
         desired_subnets_v6(root)?
     } else {
         Vec::new()
@@ -553,14 +555,31 @@ pub(crate) fn convert_dnsmasq(
         }
     }
 
+    let mut interfaces_configured = Vec::new();
     if options.create_subnets {
-        apply_dnsmasq_interfaces(root, &desired_v4, &desired_v6)?;
+        interfaces_configured = apply_dnsmasq_interfaces(root, &desired_v4, &desired_v6)?;
     }
 
+    let mut isc_disabled_v4 = Vec::new();
+    let mut isc_disabled_v6 = Vec::new();
+    let mut backend_enabled_v4 = false;
+    let mut backend_enabled_v6 = false;
     if options.enable_backend {
-        disable_isc_dhcp(root, &desired_v4, &desired_v6)?;
-        if !desired_v4.is_empty() || !desired_v6.is_empty() {
-            enable_dnsmasq(root)?;
+        let (disabled_v4, disabled_v6) = disable_isc_dhcp_from_config(root)?;
+        isc_disabled_v4 = disabled_v4;
+        isc_disabled_v6 = disabled_v6;
+        let has_ranges = !desired_v4.is_empty()
+            || !desired_v6.is_empty()
+            || !existing_ranges.is_empty();
+        if has_ranges {
+            backend_enabled_v4 = enable_dnsmasq(root)?;
+            backend_enabled_v6 = backend_enabled_v4;
+        }
+
+        if has_ranges && !backend_enabled_v4 {
+            return Err(anyhow!(
+                "Failed to enable dnsmasq. Check that <dnsmasq> is present."
+            ));
         }
     }
 
@@ -573,6 +592,11 @@ pub(crate) fn convert_dnsmasq(
         reservations_v6_to_create: to_create_v6,
         reservations_skipped: skipped,
         reservations_v6_skipped: skipped_v6,
+        interfaces_configured,
+        isc_disabled_v4,
+        isc_disabled_v6,
+        backend_enabled_v4,
+        backend_enabled_v6,
     })
 }
 
@@ -584,7 +608,7 @@ pub(crate) fn apply_dnsmasq_interfaces(
     root: &mut Element,
     desired_v4: &[DesiredSubnetV4],
     desired_v6: &[DesiredSubnetV6],
-) -> Result<()> {
+) -> Result<Vec<String>> {
     // Collect unique interfaces from both v4 and v6 subnets
     let mut ifaces: std::collections::HashSet<String> = std::collections::HashSet::new();
     for subnet in desired_v4 {
@@ -595,7 +619,7 @@ pub(crate) fn apply_dnsmasq_interfaces(
     }
 
     if ifaces.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
 
     let dnsmasq_node = get_dnsmasq_node(root)?;
@@ -624,5 +648,5 @@ pub(crate) fn apply_dnsmasq_interfaces(
         .push(XMLNode::Text(sorted_ifaces.join(",")));
     dnsmasq_node.children.push(XMLNode::Element(ifaces_elem));
 
-    Ok(())
+    Ok(sorted_ifaces)
 }
