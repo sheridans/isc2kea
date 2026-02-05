@@ -13,7 +13,9 @@ use crate::subnet::{find_subnet_for_ip, find_subnet_for_ip_v6};
 use crate::{IscStaticMap, IscStaticMapV6, MigrationError, MigrationOptions, MigrationStats};
 
 use super::options::apply_kea_options;
-use super::subnets::{apply_kea_subnets, desired_subnets_v4, desired_subnets_v6};
+use super::subnets::{
+    apply_kea_interfaces, apply_kea_subnets, desired_subnets_v4, desired_subnets_v6,
+};
 use super::utils::{short_uuid, validate_mapping_ifaces_v4, validate_mapping_ifaces_v6};
 
 /// Scan an input configuration for Kea migration stats.
@@ -298,6 +300,7 @@ pub(crate) fn convert_kea(
             &desired_v6,
             options,
         )?;
+        apply_kea_interfaces(root, &desired_v4, &desired_v6)?;
     }
 
     if options.create_options {

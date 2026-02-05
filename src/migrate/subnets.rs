@@ -121,6 +121,22 @@ fn get_kea_subnets_node_mut(root: &mut Element, v6: bool) -> Result<&mut Element
         .ok_or_else(|| anyhow!("Failed to access Kea subnets node"))
 }
 
+fn get_kea_general_node_mut(root: &mut Element, v6: bool) -> Result<&mut Element> {
+    let kea = crate::xml_helpers::find_mut_descendant_ci(root, "Kea")
+        .ok_or_else(|| anyhow!("Kea not configured in config.xml"))?;
+    let dhcp_name = if v6 { "dhcp6" } else { "dhcp4" };
+    let dhcp = crate::xml_helpers::find_mut_descendant_ci(kea, dhcp_name)
+        .ok_or_else(|| anyhow!("Failed to access Kea {} node", dhcp_name))?;
+
+    if crate::xml_helpers::get_mut_child_ci(dhcp, "general").is_none() {
+        dhcp.children
+            .push(XMLNode::Element(Element::new("general")));
+    }
+
+    crate::xml_helpers::get_mut_child_ci(dhcp, "general")
+        .ok_or_else(|| anyhow!("Failed to access Kea general node"))
+}
+
 fn create_kea_subnet4_element(cidr: &str, ranges: &[IscRangeV4]) -> Element {
     let mut subnet4 = Element::new("subnet4");
     subnet4
@@ -143,7 +159,7 @@ fn create_kea_subnet4_element(cidr: &str, ranges: &[IscRangeV4]) -> Element {
     subnet4
 }
 
-fn create_kea_subnet6_element(cidr: &str, ranges: &[IscRangeV6]) -> Element {
+fn create_kea_subnet6_element(cidr: &str, ranges: &[IscRangeV6], iface: &str) -> Element {
     let mut subnet6 = Element::new("subnet6");
     subnet6
         .attributes
@@ -161,6 +177,12 @@ fn create_kea_subnet6_element(cidr: &str, ranges: &[IscRangeV6]) -> Element {
         .join(",");
     pools.children.push(XMLNode::Text(pool_str));
     subnet6.children.push(XMLNode::Element(pools));
+
+    let mut interface_elem = Element::new("interface");
+    interface_elem
+        .children
+        .push(XMLNode::Text(iface.to_string()));
+    subnet6.children.push(XMLNode::Element(interface_elem));
 
     subnet6
 }
@@ -233,7 +255,7 @@ pub(crate) fn apply_kea_subnets(
                     continue;
                 }
             }
-            let elem = create_kea_subnet6_element(&subnet.cidr, &subnet.ranges);
+            let elem = create_kea_subnet6_element(&subnet.cidr, &subnet.ranges, &subnet.iface);
             subnets_node.children.push(XMLNode::Element(elem));
         }
     }
@@ -253,4 +275,81 @@ pub(crate) fn cidr_prefix_v6(cidr: &str) -> Result<u8> {
     let net = ipnet::Ipv6Net::from_str(cidr)
         .map_err(|_| MigrationError::InvalidCidr(cidr.to_string()))?;
     Ok(net.prefix_len())
+}
+
+pub(crate) fn apply_kea_interfaces(
+    root: &mut Element,
+    desired_v4: &[DesiredSubnetV4],
+    desired_v6: &[DesiredSubnetV6],
+) -> Result<()> {
+    // Collect unique interfaces from desired subnets
+    let mut ifaces_v4: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for subnet in desired_v4 {
+        ifaces_v4.insert(subnet.iface.clone());
+    }
+
+    let mut ifaces_v6: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for subnet in desired_v6 {
+        ifaces_v6.insert(subnet.iface.clone());
+    }
+
+    // Apply v4 interfaces
+    if !ifaces_v4.is_empty() {
+        let general = get_kea_general_node_mut(root, false)?;
+
+        // Get existing interfaces and merge
+        let existing = crate::xml_helpers::get_child_ci(general, "interfaces")
+            .and_then(|e| e.get_text())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+
+        for iface in existing.split(',').filter(|s| !s.is_empty()) {
+            ifaces_v4.insert(iface.to_string());
+        }
+
+        // Remove existing interfaces element if present
+        general
+            .children
+            .retain(|c| c.as_element().is_none_or(|e| e.name != "interfaces"));
+
+        // Add merged interfaces
+        let mut ifaces_elem = Element::new("interfaces");
+        let mut sorted_ifaces: Vec<_> = ifaces_v4.into_iter().collect();
+        sorted_ifaces.sort();
+        ifaces_elem
+            .children
+            .push(XMLNode::Text(sorted_ifaces.join(",")));
+        general.children.push(XMLNode::Element(ifaces_elem));
+    }
+
+    // Apply v6 interfaces
+    if !ifaces_v6.is_empty() {
+        let general = get_kea_general_node_mut(root, true)?;
+
+        // Get existing interfaces and merge
+        let existing = crate::xml_helpers::get_child_ci(general, "interfaces")
+            .and_then(|e| e.get_text())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+
+        for iface in existing.split(',').filter(|s| !s.is_empty()) {
+            ifaces_v6.insert(iface.to_string());
+        }
+
+        // Remove existing interfaces element if present
+        general
+            .children
+            .retain(|c| c.as_element().is_none_or(|e| e.name != "interfaces"));
+
+        // Add merged interfaces
+        let mut ifaces_elem = Element::new("interfaces");
+        let mut sorted_ifaces: Vec<_> = ifaces_v6.into_iter().collect();
+        sorted_ifaces.sort();
+        ifaces_elem
+            .children
+            .push(XMLNode::Text(sorted_ifaces.join(",")));
+        general.children.push(XMLNode::Element(ifaces_elem));
+    }
+
+    Ok(())
 }

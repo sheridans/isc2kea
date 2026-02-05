@@ -901,3 +901,39 @@ pub const TEST_CREATE_OPTIONS_KEA_V4_EXISTING: &str = r#"<?xml version="1.0"?>
     </Kea>
 </opnsense>
 "#;
+
+pub const TEST_CREATE_SUBNETS_KEA_V4_EXISTING_INTERFACES: &str = r#"<?xml version="1.0"?>
+<opnsense>
+    <interfaces>
+        <opt1>
+            <ipaddr>10.22.1.1</ipaddr>
+            <subnet>24</subnet>
+        </opt1>
+        <opt2>
+            <ipaddr>10.22.2.1</ipaddr>
+            <subnet>24</subnet>
+        </opt2>
+    </interfaces>
+    <dhcpd>
+        <opt2>
+            <range>
+                <from>10.22.2.100</from>
+                <to>10.22.2.200</to>
+            </range>
+            <staticmap>
+                <mac>04:d9:f5:cb:9b:54</mac>
+                <ipaddr>10.22.2.50</ipaddr>
+            </staticmap>
+        </opt2>
+    </dhcpd>
+    <Kea>
+        <dhcp4>
+            <general>
+                <interfaces>opt1</interfaces>
+            </general>
+            <subnets></subnets>
+            <reservations></reservations>
+        </dhcp4>
+    </Kea>
+</opnsense>
+"#;
